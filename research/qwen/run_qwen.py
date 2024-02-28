@@ -45,6 +45,7 @@ def clear_auto_trans_output(config):
         mox.file.make_dirs(obs_strategy_dir)
         mox.file.make_dirs(obs_transformed_ckpt_dir)
     else:
+        # 把目录删了重建
         strategy_dir = os.path.join(get_output_root_path(), "strategy")
         if os.path.exists(strategy_dir) and config.local_rank % 8 == 0:
             shutil.rmtree(strategy_dir)
@@ -72,10 +73,12 @@ def main(task='text_generation',
          top_k=None,
          top_p=None):
     """main function."""
+    # 主入口函数, 可以执行多个任务
 
     yaml_path = os.path.expanduser(config)
     assert os.path.exists(yaml_path)
 
+    # 加载配置文件
     config = MindFormerConfig(os.path.realpath(yaml_path))
     if vocab_file:
         assert os.path.exists(vocab_file)
@@ -88,6 +91,7 @@ def main(task='text_generation',
     # init context
     build_context(config)
 
+    # 开启权重自动转换
     if auto_trans_ckpt is not None:
         config.auto_trans_ckpt = auto_trans_ckpt
         if config.auto_trans_ckpt:
@@ -108,6 +112,7 @@ def main(task='text_generation',
         config.model.model_config.use_past = False
 
     if run_mode == 'predict':
+        # 预测模式, 使用高阶的 Trainer 类. 这里就是模型转换的第一步, 将完整权重转换成多卡权重
         task = Trainer(args=config, task=task)
         prompt = predict_data
         result = task.predict(input_data=prompt,
