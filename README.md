@@ -22,10 +22,10 @@ MindSpore Transformers套件基于MindSpore内置的并行技术和组件化设�
 
 如果您对MindSpore Transformers有任何建议，请通过issue与我们联系，我们将及时处理。
 
-- 📝 **[MindFormers教程文档](https://mindformers.readthedocs.io/zh_CN/latest)**
-- 📝 [大模型能力表一览](https://mindformers.readthedocs.io/zh-cn/latest/docs/model_support_list.html#llm)
-- 📝 [MindPet指导教程](docs/feature_cards/Pet_Tuners.md)
-- 📝 [AICC指导教程](docs/readthedocs/source_zh_cn/docs/practice/AICC.md)
+- **[MindFormers教程文档](https://mindformers.readthedocs.io/zh_CN/latest)**
+- [大模型支持列表](https://mindformers.readthedocs.io/zh-cn/latest/docs/model_support_list.html#llm)
+- [MindPet指导教程](docs/feature_cards/Pet_Tuners.md)
+- [AICC指导教程](docs/readthedocs/source_zh_cn/docs/practice/AICC.md)
 
 目前支持的模型列表如下：
 
@@ -33,6 +33,7 @@ MindSpore Transformers套件基于MindSpore内置的并行技术和组件化设�
 |:--------------------------------------------------:|:-------------------------------------------------------------------|
 |        [LLama2](docs/model_cards/llama2.md)        | llama2_7b, llama2_13b, llama2_7b_lora, llama2_13b_lora, llama2_70b |
 |          [GLM2](docs/model_cards/glm2.md)          | glm2_6b, glm2_6b_lora                                              |
+|     [CodeLlama](docs/model_cards/codellama.md)     | codellama_34b                                                      |
 |     [CodeGeex2](docs/model_cards/codegeex2.md)     | codegeex2_6b                                                       |
 |         [LLama](docs/model_cards/llama.md)         | llama_7b, llama_13b, llama_7b_lora                                 |
 |           [GLM](docs/model_cards/glm.md)           | glm_6b, glm_6b_lora                                                |
@@ -50,10 +51,12 @@ MindSpore Transformers套件基于MindSpore内置的并行技术和组件化设�
 |    [Baichuan2](research/baichuan2/baichuan2.md)    | baichuan2_7b, baichuan2_13b, baichuan2_7b_lora, baichuan2_13b_lora |
 |     [Baichuan](research/baichuan/baichuan.md)      | baichuan_7b, baichuan_13b                                          |
 |           [Qwen](research/qwen/qwen.md)            | qwen_7b, qwen_14b, qwen_7b_lora, qwen_14b_lora                     |
+|        [Qwen1_5](research/qwen1_5/qwen1_5.md)         | qwen1_5_72b                                                        |
 | [Wizardcoder](research/wizardcoder/wizardcoder.md) | wizardcoder_15b                                                    |
 |     [Internlm](research/internlm/internlm.md)      | internlm_7b, internlm_20b, internlm_7b_lora                        |
 |           [ziya](research/ziya/ziya.md)            | ziya_13b                                                           |
 |    [VisualGLM](research/visualglm/visualglm.md)    | visualglm                                                          |
+|[iFlytekSpark](research/iflytekspark/iflytekspark.md)    | iflytekspark_13b, iflytekspark_13b_lora                                               |
 
 ## 二、mindformers安装
 
@@ -62,7 +65,7 @@ MindSpore Transformers套件基于MindSpore内置的并行技术和组件化设�
 支持源码编译安装，用户可以执行下述的命令进行包的安装。
 
 ```bash
-git clone -b dev https://gitee.com/mindspore/mindformers.git
+git clone -b r1.0 https://gitee.com/mindspore/mindformers.git
 cd mindformers
 bash build.sh
 ```
@@ -109,15 +112,13 @@ swr.cn-central-221.ovaijisuan.com/mindformers/mindformers1.0_mindspore2.2.11:aar
 
 ## 三、版本匹配关系
 
-当前支持的硬件为Atlas 800训练服务器与[Atlas 800T A2](https://www.hiascend.com/hardware/ai-server?tag=900A2)训练服务器。
+当前支持的硬件为Atlas 800训练服务器 与 [Atlas 800T A2](https://www.hiascend.com/hardware/ai-server?tag=900A2)训练服务器。
 
 当前套件建议使用的Python版本为3.9。
 
-| MindFormers | MindPet |                 MindSpore                  |                                                                                                                                               CANN                                                                                                                                               |                               驱动固件                               |                               镜像链接                               | 备注                 |
-| :---------: | :-----: | :----------------------------------------: | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------: | :------------------------------------------------------------------: | :------------------------------------------------------------------: | -------------------- |
-|     dev     |  1.0.3  | [2.2.11](https://www.mindspore.cn/install) |           7.0.0.beta1:<br> [aarch64](https://ascend-repo.obs.cn-east-2.myhuaweicloud.com/CANN/CANN%207.0.0/Ascend-cann-toolkit_7.0.0_linux-aarch64.run)<br> [x86_64](https://ascend-repo.obs.cn-east-2.myhuaweicloud.com/CANN/CANN%207.0.0/Ascend-cann-toolkit_7.0.0_linux-x86_64.run)           | [链接](https://www.hiascend.com/hardware/firmware-drivers/community) |                                  /                                   | 开发分支(非稳定版本) |
-|    r1.0     |  1.0.3  | [2.2.11](https://www.mindspore.cn/install) |           7.0.0.beta1:<br> [aarch64](https://ascend-repo.obs.cn-east-2.myhuaweicloud.com/CANN/CANN%207.0.0/Ascend-cann-toolkit_7.0.0_linux-aarch64.run)<br> [x86_64](https://ascend-repo.obs.cn-east-2.myhuaweicloud.com/CANN/CANN%207.0.0/Ascend-cann-toolkit_7.0.0_linux-x86_64.run)           | [链接](https://www.hiascend.com/hardware/firmware-drivers/community) | [链接](http://mirrors.cn-central-221.ovaijisuan.com/detail/118.html) | 发布版本             |
-|    r0.8     |  1.0.2  | [2.2.1](https://www.mindspore.cn/install)  | 7.0.RC1.3.beta1:<br> [aarch64](https://ascend-repo.obs.cn-east-2.myhuaweicloud.com/CANN/CANN%207.0.RC1.3/Ascend-cann-toolkit_7.0.RC1.3_linux-aarch64.run)<br> [x86_64](https://ascend-repo.obs.cn-east-2.myhuaweicloud.com/CANN/CANN%207.0.RC1.3/Ascend-cann-toolkit_7.0.RC1.3_linux-x86_64.run) | [链接](https://www.hiascend.com/hardware/firmware-drivers/community) |                                  /                                   | 历史发布版本                    |
+| MindFormers | MindPet |                 MindSpore                  |                                                                                                                                     CANN                                                                                                                                     |                               驱动固件                               |                               镜像链接                               | 备注     |
+| :---------: | :-----: | :----------------------------------------: | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------: | :------------------------------------------------------------------: | :------------------------------------------------------------------: | -------- |
+|    r1.0     |  1.0.3  | [2.2.11](https://www.mindspore.cn/install) | 7.0.0.beta1:<br> [aarch64](https://ascend-repo.obs.cn-east-2.myhuaweicloud.com/CANN/CANN%207.0.0/Ascend-cann-toolkit_7.0.0_linux-aarch64.run)<br> [x86_64](https://ascend-repo.obs.cn-east-2.myhuaweicloud.com/CANN/CANN%207.0.0/Ascend-cann-toolkit_7.0.0_linux-x86_64.run) | [链接](https://www.hiascend.com/hardware/firmware-drivers/community) | [链接](http://mirrors.cn-central-221.ovaijisuan.com/detail/118.html) | 版本分支 |
 
 其中CANN，固件驱动的安装需与使用的机器匹配，请注意识别机器型号，选择对应架构的版本
 
@@ -133,10 +134,10 @@ MindFormers套件对外提供两种使用和开发形式，为开发者提供灵
 
     - step1：克隆mindformers仓库。
 
-      ```shell
-      git clone -b dev https://gitee.com/mindspore/mindformers.git
-      cd mindformers
-      ```
+  ```shell
+  git clone -b r1.0 https://gitee.com/mindspore/mindformers.git
+  cd mindformers
+  ```
 
     - step2: 准备相应任务的数据集，请参考`docs`目录下各模型的README.md文档准备相应数据集。
 
@@ -144,10 +145,10 @@ MindFormers套件对外提供两种使用和开发形式，为开发者提供灵
 
     - step4：如果要使用分布式训练，则需提前生成RANK_TABLE_FILE。
 
-      ```shell
-      # 不包含8本身，生成0~7卡的hccl json文件
-      python mindformers/tools/hccl_tools.py --device_num [0,8)
-      ```
+  ```shell
+  # 不包含8本身，生成0~7卡的hccl json文件。注意：不支持在镜像容器中执行该命令，请在容器外执行。
+  python mindformers/tools/hccl_tools.py --device_num [0,8)
+  ```
 
 - 单卡启动：统一接口启动，根据模型的config配置，完成任意模型的单卡训练、微调、评估、推理流程。
 

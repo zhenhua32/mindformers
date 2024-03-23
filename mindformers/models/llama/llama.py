@@ -252,7 +252,7 @@ class LlamaModel(LlamaPreTrainedModel):
 
             self.tok_embeddings.shard(config.parallel_config)
             self.casual_mask.shard(config.parallel_config)
-            if config.fine_grain_interleave > 1:
+            if config.fine_grain_interleave > 1 and config.parallel_config.model_parallel > 1:
                 self.norm_out.shard((dp, 1))
             else:
                 self.norm_out.shard((dp, 1, 1))
@@ -401,7 +401,7 @@ class LlamaForCausalLM(LlamaPreTrainedModel):
 
     def prepare_inputs_for_export(self, full_model=True):
         dyn = self.config.is_dynamic
-        use_paged_attention = self.config.use_paged_attention
+        use_paged_attention = self.config.use_paged_attention and check_valid_paged_attention()
         if dyn:
             logger.info(f"Exporting dynamic MindIR...")
         if use_paged_attention:
@@ -409,9 +409,9 @@ class LlamaForCausalLM(LlamaPreTrainedModel):
         seq_length = self.seq_length
         bs = None if dyn else self.config.batch_size
         seq_len = None if dyn else self.seq_length
-
         max_num_blocks_pre_batch = None if dyn else seq_len // self.config.block_size
-        logger.info(f"max num blocks pre batch: {max_num_blocks_pre_batch}")
+        if use_paged_attention:
+            logger.info(f"max num blocks pre batch: {max_num_blocks_pre_batch}")
 
         def dummy_tensor(shape, dtype):
             if None in shape:

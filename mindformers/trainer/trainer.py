@@ -35,8 +35,8 @@ from mindformers.core.parallel_config import build_parallel_config
 from mindformers.dataset import build_dataset, build_dataset_loader, \
     check_dataset_config, BaseDataset
 from mindformers.mindformer_book import MindFormerBook
-from mindformers.models import PreTrainedModel, BaseImageProcessor, \
-    PreTrainedTokenizerBase, BaseAudioProcessor
+from mindformers.models import BaseModel, BaseImageProcessor, \
+    BaseTokenizer, BaseAudioProcessor
 from mindformers.tools.utils import set_output_path, set_strategy_save_path
 from mindformers.tools.logger import logger
 from mindformers.tools.utils import get_real_rank, get_real_group_size

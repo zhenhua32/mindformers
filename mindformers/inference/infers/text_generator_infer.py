@@ -23,7 +23,7 @@ import mindspore_lite as mslite
 from mindspore_lite import Model
 
 from mindformers.tools.logger import logger
-from mindformers.models import PreTrainedTokenizerBase, BaseImageProcessor
+from mindformers.models import BaseTokenizer, BaseImageProcessor
 from mindformers.generation import GenerationConfig, LogitsProcessorList
 from mindformers.generation.logits_process import RepetitionPenaltyLogitsProcessor, LogitNormalization, \
     TemperatureLogitsWarper, TopKLogitsWarper, TopPLogitsWarper
@@ -202,6 +202,7 @@ class InputOfInfer:
         "glm": GLMInputsOfInfer,
         "baichuan2": LlamaInputsOfInfer,
         "internlm": LlamaInputsOfInfer,
+        "qwen": LlamaInputsOfInfer,
         "common": CommonInputsOfInfer
     }
 
@@ -237,7 +238,7 @@ class TextGeneratorInfer(BaseInfer):
     """
     def __init__(self,
                  config: InferConfig = None,
-                 tokenizer: Optional[PreTrainedTokenizerBase] = None,
+                 tokenizer: Optional[BaseTokenizer] = None,
                  image_processor: Optional[BaseImageProcessor] = None):
         super(TextGeneratorInfer, self).__init__(config, tokenizer, image_processor)
         if self.paged_attention:
@@ -492,6 +493,7 @@ class TextGeneratorInfer(BaseInfer):
 
         if self.dynamic:
             batch_size_gear, act_len_gear = self.dynshape_gears.match(batch_size, max_length)
+            logger.info(f"[DYNAMIC] found matched gear: batch_size={batch_size_gear}, seq_length={act_len_gear}")
             bs_pad = batch_size_gear - batch_size
             pad_input_ids = np.pad(pad_input_ids, ((0, bs_pad), (0, 0)), 'constant', constant_values=pad_token_id)
             valid_length = np.pad(valid_length, (0, bs_pad), 'constant', constant_values=1)

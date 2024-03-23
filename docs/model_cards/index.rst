@@ -13,6 +13,7 @@
    ../../research/baichuan/baichuan
    ../../research/baichuan2/baichuan2
    ../../research/qwen/qwen
+   ../../research/qwen1_5/qwen1_5
    llama2
    llama
    glm3
@@ -34,3 +35,4 @@
    mae
    swin
    vit
+   ../../research/iflytekspark/iflytekspark

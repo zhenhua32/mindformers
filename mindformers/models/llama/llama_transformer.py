@@ -40,6 +40,7 @@ from mindformers.models.llama.llama_moe import LlamaMoE
 from mindformers.modules.layers import _check_input_dtype, Linear
 from mindformers.modules.transformer import TransformerOpParallelConfig
 from mindformers.modules import KVCacheMgr, PagedAttentionMgr
+
 from mindformers.tools.utils import is_version_ge
 from mindformers.tools.logger import logger
 
