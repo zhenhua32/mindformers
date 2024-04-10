@@ -34,20 +34,26 @@ try:
     FLASHATTENTION_VALID = True
 except ImportError:
     FLASHATTENTION_VALID = False
+try:
+    # pylint: disable=W0611
+    from mindspore.ops.operations.nn_ops import PromptFlashAttention
+    PROMPTFLASHATTENTION_VALID = True
+except ImportError:
+    PROMPTFLASHATTENTION_VALID = False
 
 from mindformers.core.loss.loss import CrossEntropyLoss
 from mindformers.models.modeling_utils import PreTrainedModel
 from mindformers.models.utils import cell_reuse
 from mindformers.modules.transformer.op_parallel_config import _check_config
-from mindformers.modules.transformer.transformer import LowerTriangularMaskWithDynamic
 from mindformers.tools.register.register import MindFormerModuleType, MindFormerRegister
 
 from mindformers.models.llama.llama import layer_compute_dtype
 from mindformers.models.llama.llama_config import LlamaConfig
-from mindformers.models.llama.llama_layer import LlamaEmbedding, LlamaRMSNorm, FreqsMgr
+from mindformers.models.llama.llama_layer import LlamaEmbedding, LlamaRMSNorm, FreqsMgr, CausalMask
 from mindformers.models.llama.llama_transformer import LLamaDecodeLayer
 from mindformers.tools.logger import logger
 from mindformers.modules import KVCachePreprocess
+from mindformers.version_control import check_valid_flash_attention, check_valid_paged_attention
 
 __all__ = ['Baichuan7BV2ForCausalLM', 'Baichuan7BV2Model']
 
@@ -92,14 +98,14 @@ class Baichuan7BV2Model(Baichuan2PreTrainedModel):
         self.is_dynamic = config.is_dynamic
         self.use_kvcache_op = config.use_kvcache_op
         self.is_flexible_shape = config.is_flexible_shape
-        self.use_flash_attention = config.use_flash_attention and FLASHATTENTION_VALID
         # only support flash attention in train and prefill predict process.
-        if self.use_past:
-            self.use_flash_attention = False
-        if self.use_flash_attention:
-            logger.info("Enable flash attention.")
-        elif config.use_flash_attention:
-            logger.info("Current MindSpore do not support flash attention.")
+        self.use_flash_attention = config.use_flash_attention and (not self.use_past) and \
+            check_valid_flash_attention(FLASHATTENTION_VALID, 'FlashAttention')
+        # only support prompt flash attention in prefill phase of inference.
+        self.use_prompt_flash_attention = config.use_prompt_flash_attention and self.use_past and \
+            check_valid_flash_attention(PROMPTFLASHATTENTION_VALID, 'PromptFlashAttention')
+        # only support paged attention in decoding phase of inference.
+        self.use_paged_attention = config.use_paged_attention and self.use_past and check_valid_paged_attention()
 
         self.shape = P.Shape()
         self.reshape = P.Reshape().add_prim_attr("skip_redistribution", True)
@@ -117,11 +123,12 @@ class Baichuan7BV2Model(Baichuan2PreTrainedModel):
                                   scaling_factor=config.scaling_factor,
                                   extend_method=config.extend_method,
                                   is_dynamic=config.is_dynamic)
-        self.casual_mask = LowerTriangularMaskWithDynamic(seq_length=config.seq_length,
-                                                          compute_type=config.compute_dtype,
-                                                          is_dynamic=config.is_dynamic,
-                                                          pad_token_id=config.pad_token_id,
-                                                          use_flash_attention=config.use_flash_attention)
+        self.casual_mask = CausalMask(seq_length=config.seq_length,
+                                      compute_type=config.compute_dtype,
+                                      is_dynamic=config.is_dynamic,
+                                      pad_token_id=config.pad_token_id,
+                                      use_flash_attention=self.use_flash_attention,
+                                      use_prompt_flash_attention=self.use_prompt_flash_attention)
         self.tok_embeddings = LlamaEmbedding(vocab_table_size=config.vocab_size,
                                              embedding_size=config.hidden_size,
                                              param_init_type=config.param_init_type,
@@ -147,6 +154,10 @@ class Baichuan7BV2Model(Baichuan2PreTrainedModel):
                                      param_init_type=config.param_init_type,
                                      use_past=config.use_past,
                                      use_flash_attention=self.use_flash_attention,
+                                     use_prompt_flash_attention=self.use_prompt_flash_attention,
+                                     use_paged_attention=self.use_paged_attention,
+                                     block_size=config.block_size,
+                                     num_blocks=config.num_blocks,
                                      is_dynamic=config.is_dynamic,
                                      use_kvcache_op=config.use_kvcache_op,
                                      is_flexible_shape=config.is_flexible_shape,
@@ -161,7 +172,8 @@ class Baichuan7BV2Model(Baichuan2PreTrainedModel):
                                                     max_seq_length=config.seq_length,
                                                     is_dynamic=config.is_dynamic,
                                                     use_kvcache_op=config.use_kvcache_op,
-                                                    is_flexible_shape=config.is_flexible_shape)
+                                                    is_flexible_shape=config.is_flexible_shape,
+                                                    use_paged_attention=config.use_paged_attention)
 
         dp = config.parallel_config.data_parallel
         if not (_get_parallel_mode() in (ParallelMode.AUTO_PARALLEL,) and _is_sharding_propagation()):
@@ -179,7 +191,8 @@ class Baichuan7BV2Model(Baichuan2PreTrainedModel):
             self.norm_out.shard((dp, 1, 1))
 
     # pylint: disable=W0613
-    def construct(self, tokens: Tensor, batch_valid_length=None, batch_index=None, zactivate_len=None):
+    def construct(self, tokens: Tensor, batch_valid_length=None, batch_index=None, zactivate_len=None,
+                  block_tables=None, slot_mapping=None):
         """
         Forward of llama model.
 
@@ -203,7 +216,6 @@ class Baichuan7BV2Model(Baichuan2PreTrainedModel):
         if not self.use_past:
             freqs_cis = self.freqs_mgr()
             mask = self.casual_mask(tokens) # mask: [bs, seq, seq]
-            mask = self.casual_mask.post_process(mask)
             kvcache_inputs = None
         else:
             if self.is_first_iteration:
@@ -217,9 +229,9 @@ class Baichuan7BV2Model(Baichuan2PreTrainedModel):
                                                             batch_valid_length, zactivate_len)
                 else:
                     mask = self.casual_mask.increment(self.kvcache_preprocess.range, batch_valid_length, zactivate_len)
-            mask = self.casual_mask.post_process(mask)
 
-            kvcache_inputs = self.kvcache_preprocess(bs, batch_valid_length, batch_index, zactivate_len)
+            kvcache_inputs = self.kvcache_preprocess(bs, batch_valid_length, batch_index, zactivate_len,
+                                                     block_tables, slot_mapping)
 
         # tokens: [bs, seq/1]
         h = self.tok_embeddings(tokens)
@@ -413,11 +425,17 @@ class Baichuan7BV2ForCausalLM(Baichuan2PreTrainedModel):
     def prepare_inputs_for_export(self, full_model=True):
         """prepare_inputs_for_export"""
         dyn = self.config.is_dynamic
+        use_paged_attention = self.config.use_paged_attention
         if dyn:
             logger.info(f"Exporting dynamic MindIR...")
-        seq_length = self.seq_length
+        if use_paged_attention:
+            logger.info(f"Exporting model with paged attention...")
         bs = None if dyn else self.config.batch_size
         seq_len = None if dyn else self.seq_length
+        prefill_mapping_len = None if dyn else bs * seq_len
+        inc_mapping_len = None if dyn else bs * 1
+        block_size = self.config.block_size
+        max_num_blocks_per_batch = None if dyn else self.seq_length // block_size
 
         def dummy_tensor(shape, dtype):
             if None in shape:
@@ -425,19 +443,29 @@ class Baichuan7BV2ForCausalLM(Baichuan2PreTrainedModel):
             return Tensor(np.ones(shape=tuple(shape)), dtype=dtype)
 
         batch_valid_length = dummy_tensor(shape=[bs], dtype=mstype.int32)
-        batch_index = dummy_tensor(shape=[bs], dtype=mstype.int64)
-        zactivate_len = dummy_tensor(shape=[seq_len], dtype=mstype.int64)
+        batch_index = None if use_paged_attention else dummy_tensor(shape=[bs], dtype=mstype.int64)
+        zactivate_len = None if use_paged_attention else dummy_tensor(shape=[seq_len], dtype=mstype.int64)
+
         if full_model:
-            logger.info('\nexporting with batch_size = %s, seq = %s ...', self.config.batch_size, seq_length)
+            logger.info('\nexporting with batch_size = %s, seq = %s ...', self.config.batch_size, self.seq_length)
             input_ids = dummy_tensor(shape=[bs, seq_len], dtype=mstype.int32)
+            block_tables = None
+            slot_mapping = dummy_tensor(shape=[prefill_mapping_len],
+                                        dtype=mstype.int32) if use_paged_attention else None
         else:
             logger.info('\nexporting with batch_size = %s, seq = 1 ...', self.config.batch_size)
             input_ids = dummy_tensor(shape=[bs, 1], dtype=mstype.int32)
-        return input_ids, None, None, None, None, None, None, batch_valid_length, batch_index, zactivate_len
+            block_tables = dummy_tensor(shape=[inc_mapping_len, max_num_blocks_per_batch],
+                                        dtype=mstype.int32) if use_paged_attention else None
+            slot_mapping = dummy_tensor(shape=[inc_mapping_len],
+                                        dtype=mstype.int32) if use_paged_attention else None
+        return input_ids, None, None, None, None, None, None, batch_valid_length, batch_index, zactivate_len, \
+            block_tables, slot_mapping
 
     # pylint: disable=W0613
     def construct(self, input_ids, labels=None, input_position=None, position_ids=None, attention_mask=None,
-                  input_embeds=None, init_reset=True, batch_valid_length=None, batch_index=None, zactivate_len=None):
+                  input_embeds=None, init_reset=True, batch_valid_length=None, batch_index=None, zactivate_len=None,
+                  block_tables=None, slot_mapping=None):
         """Baichuan7BV2 ForCausalLM forward."""
         bsz, seqlen = self.shape(input_ids)
         if self.use_past:
@@ -451,7 +479,7 @@ class Baichuan7BV2ForCausalLM(Baichuan2PreTrainedModel):
             batch_valid_length = self.reshape(batch_valid_length, (-1,))
         if not self.is_first_iteration:
             batch_valid_length = self.sub_batch_valid_len(batch_valid_length, 1)
-        output = self.model(tokens, batch_valid_length, batch_index, zactivate_len)
+        output = self.model(tokens, batch_valid_length, batch_index, zactivate_len, block_tables, slot_mapping)
         pre_gather = (not self.use_past or self.is_first_iteration) and batch_valid_length is not None
         if pre_gather:
             output = self.gather(output, self.sub_batch_valid_len(batch_valid_length, 1), 1)

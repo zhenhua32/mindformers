@@ -20,8 +20,9 @@ from mindspore._checkparam import args_type_check
 
 from mindformers.tools.register import MindFormerRegister, MindFormerModuleType
 from mindformers.modules.transformer.transformer import default_transformer_config, TransformerOpParallelConfig
-from mindformers.models.configuration_utils import PretrainedConfig
+from mindformers.models.base_config import BaseConfig
 from mindformers.models.utils import convert_mstype
+from mindformers.tools.logger import logger
 from mindformers.mindformer_book import MindFormerBook
 
 __all__ = ['ChatGLM2Config']
@@ -51,6 +52,7 @@ class ChatGLM2Config(PretrainedConfig):
                  hidden_dropout=0.0,
                  attention_dropout=0.0,
                  layernorm_epsilon=1e-5,
+                 rope_ratio=1,
                  rmsnorm=True,
                  apply_residual_connection_post_layernorm=False,
                  post_layer_norm=True,
@@ -68,10 +70,20 @@ class ChatGLM2Config(PretrainedConfig):
                  param_init_type: str = "float16",
                  compute_dtype: str = "float16",
                  layernorm_compute_type: str = "float32",
+                 embedding_type: str = "float32",
+                 mask_type: str = "float32",
+                 model_name: str = "glm2",
                  use_past=False,
                  use_flash_attention=False,
                  use_prompt_flash_attention=False,
                  use_incre_flash_attention=False,
+                 use_paged_attention: bool = False,
+                 is_dynamic: bool = False,
+                 use_kvcache_op: bool = False,
+                 is_flexible_shape: bool = False,
+                 block_size: int = 16,
+                 num_blocks: int = 512,
+                 no_recompute_layers=None,
                  eos_token_id=2,
                  pad_token_id=0,
                  gmask_token_id=None,
@@ -96,6 +108,7 @@ class ChatGLM2Config(PretrainedConfig):
         self.hidden_dropout = hidden_dropout
         self.attention_dropout = attention_dropout
         self.layernorm_epsilon = layernorm_epsilon
+        self.rope_ratio = rope_ratio
         self.rmsnorm = rmsnorm
         self.apply_residual_connection_post_layernorm = apply_residual_connection_post_layernorm
         self.post_layer_norm = post_layer_norm
@@ -113,10 +126,20 @@ class ChatGLM2Config(PretrainedConfig):
         self.param_init_type = convert_mstype(param_init_type)
         self.compute_dtype = convert_mstype(compute_dtype)
         self.layernorm_compute_type = convert_mstype(layernorm_compute_type)
+        self.embedding_type = convert_mstype(embedding_type)
+        self.mask_type = convert_mstype(mask_type)
+        self.model_name = model_name
         self.use_past = use_past
         self.use_flash_attention = use_flash_attention
         self.use_prompt_flash_attention = use_prompt_flash_attention
         self.use_incre_flash_attention = use_incre_flash_attention
+        self.use_paged_attention = use_paged_attention
+        self.block_size = block_size
+        self.num_blocks = num_blocks
+        self.is_dynamic = is_dynamic
+        self.use_kvcache_op = use_kvcache_op
+        self.is_flexible_shape = is_flexible_shape
+        self.no_recompute_layers = no_recompute_layers
         self.eos_token_id = eos_token_id
         self.pad_token_id = pad_token_id
         self.repetition_penalty = repetition_penalty
@@ -125,3 +148,7 @@ class ChatGLM2Config(PretrainedConfig):
         self.max_length = max_length
         self.gmask_token_id = gmask_token_id
         self.bos_token_id = bos_token_id
+        if batch_size * seq_length // self.block_size >= self.num_blocks:
+            logger.warning(
+                f"Argument `num blocks` is less than the maximum possible block numbers. "
+                f"May cause `block pool is out of memory` error")

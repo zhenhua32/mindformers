@@ -177,11 +177,10 @@ def fix_optim_global_step_sig():
 
 def check_valid_flash_attention(import_fa_valid=True, fa_type=None):
     """check mindspore version is valid for input flash attention"""
-    version_map = {"IncreFlashAttention": "2.3.0",
-                   "PromptFlashAttention": "2.2.0",
+    version_map = {"PromptFlashAttention": "2.2.12",
                    "FlashAttention": "2.2.0"}
     valid_version = version_map.get(fa_type)
-    if not is_910b() and fa_type in ["PromptFlashAttention", "IncreFlashAttention"]:
+    if not is_910b() and fa_type == "PromptFlashAttention":
         logger.warning(f"Current device {get_ascend_soc_version()} do not support {fa_type}, "
                        f"please use 910b device.")
         return False
@@ -203,6 +202,7 @@ def check_valid_flash_attention(import_fa_valid=True, fa_type=None):
         result = False
     # both pass should return True
     else:
+        logger.info(f"Enable {fa_type}.")
         result = True
     return result
 
@@ -259,5 +259,6 @@ def check_valid_paged_attention():
         logger.warning("Now running on self-attention mode.")
         result = False
     else:
+        logger.info("Enable paged attention in inference.")
         result = True
     return result

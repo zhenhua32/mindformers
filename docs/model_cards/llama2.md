@@ -84,9 +84,9 @@ llama2_70b 待补充。
 ### 环境要求
 
 - 硬件：Atlas 800/Atlas 800T A2
-- MindSpore：2.2.0
+- MindSpore：2.2.13
 - CANN: 7.0
-- MindFormers版本：dev
+- MindFormers版本：1.0
 
 注：Atlas 800T A2芯片：7b,13b推理可在单机单卡上完成部署；70b推理至少使用8卡，全参微调至少需要4机32卡，推荐使用8机64卡。
 
@@ -378,6 +378,9 @@ python llama_preprocess.py \
 --seq_length 4096 \
 --output_file /{path}/wiki4096.mindrecord
 ```
+
+数据处理时候注意bos，eos，pad等特殊ids要和yaml配置中model_config里保持一致，默认bos_token_id=1, eos_token_id=2, pad_token_id=0, 如果有所修改，yaml中对应的配置也需要修改；
+一般预训练的数据中不包含pad_token，此时建议pad_token_id设为-1。
 
 ### 脚本启动（Llama 2-7B为例）
 

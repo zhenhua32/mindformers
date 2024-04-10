@@ -879,7 +879,7 @@ class LowerTriangularMaskWithDynamic(Cell):
 
     @_LogActionOnce(m_logger=logger, key='AttentionMask',
                     no_warning=_get_parallel_mode() in (ParallelMode.STAND_ALONE,))
-    def __init__(self, seq_length, compute_type=mstype.float16,
+    def __init__(self, seq_length, compute_type=mstype.float16, mask_type=mstype.float32,
                  is_dynamic=False, pad_token_id=2, use_flash_attention=False):
         super().__init__()
         self.dtype = compute_type
@@ -888,7 +888,7 @@ class LowerTriangularMaskWithDynamic(Cell):
         self.use_flash_attention = use_flash_attention
         self.multiply_data = Tensor([-10000.0], dtype=compute_type)
         self.one = Tensor([1.0], dtype=compute_type)
-        self.lower_triangle_mask = Tensor(np.tril(np.ones(shape=(seq_length, seq_length))), mstype.float32)
+        self.lower_triangle_mask = Tensor(np.tril(np.ones(shape=(seq_length, seq_length))), mask_type)
 
         self.shape = P.Shape()
         self.cast = P.Cast()
@@ -1441,8 +1441,9 @@ class MultiHeadAttention(Cell):
                     out_strategy_matmul=((parallel_config.data_parallel * parallel_config.model_parallel, 1),))
 
         self.use_flash_attention = use_flash_attention
-        self.use_prompt_flash_attention = use_prompt_flash_attention
-        self.use_incre_flash_attention = use_incre_flash_attention
+        if self.use_flash_attention and not check_valid_flash_attention(FLASHATTENTION_VALID, 'FlashAttention'):
+            self.use_flash_attention = False
+            log.info("Current MindSpore do not support flash attention, please upgrade to 2.2.0 or higher")
 
         if self.use_flash_attention:
             self.flash_attention = FlashAttention(

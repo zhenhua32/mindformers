@@ -742,48 +742,131 @@ response, history = process_response(response, history)
 
 　　Lite 推理大致分两步：权重转换导出 MindIR -> Lite 推理，接下来分别描述上述两个过程。
 
-### MindIR 导出
+   本章节提供ChatGLM3-6B在MindSpore Lite上进行推理的基本使用流程，更多详细的特性介绍可以参考[Mindspore Lite特性文档](../../docs/feature_cards/Inference.md)
 
-1. 修改模型相关的配置文件 configs/glm3/export_glm3_6b.yaml，其中需要关注这几项：
+### 单卡导出与PA推理
+
+#### Step1. MindIR 导出
+
+1. 修改模型相关的配置文件 configs/glm3/export_glm3_6b_pa.yaml，其中需要关注这几项：
 
 ```yaml
-# export
-infer:
-   prefill_model_path: "glm3_export/glm3_6b_prefill_seq512.mindir" # 保存mindir的位置
-   increment_model_path: "glm3_export/glm3_6b_inc_seq512.mindir"   # 保存mindir的位置
-   infer_seq_length: 512 # 需要保持跟 model-model_config-seq_length 一致
-
-# ==== model config ====
+# model config
 model:
-model_config:
-  seq_length: 512
-  checkpoint_name_or_path: "/path/to/your/*.ckpt"
+  model_config:
+    seq_length: 2048
+    checkpoint_name_or_path: "/path/to/your.ckpt"
+    use_past: True              # 开启增量推理
+    is_dynamic: True            # 使用PA推理时设置为True，静态shape推理设为False
+    use_paged_attention: True   # 使用PA推理时设置为True
+    block_size: 16             # PA推理的参数设置
+    num_blocks: 224             # PA推理的参数设置
 ```
 
-2. 执行export.py，完成模型转换
+2. 执行run_mindformer.py，完成模型转换
+
+执行run_mindformer.py，完成MindIR导出，得到全量minder_full_checkpoint/rank_0_graph.mindir和增量minder_inc_checkpoint/rank_0_graph.mindir两个MindIR图
 
 ```bash
-python mindformers/tools/export.py --config_path configs/glm3/export_glm3_6b.yaml
+python run_mindformer.py
+--config configs/glm3/export_glm3_6b_pa.yaml
+--run_mode export
+--use_parallel False
+--batch_size 1
+--device_id 0
 ```
 
-### 执行推理
+#### Step2. 执行MS Lite推理
 
-1. 新建推理配置文件：lite.ini
+新建推理配置文件，ChatGLM3-6B在Atlas 800T A2上推荐的GE配置如下：
 
-    ```ini
-    [ascend_context]
-    provider=ge
+1. 全量和增量的GE配置不同，如下所示
 
-    [ge_session_options]
-    ge.exec.formatMode=1
-    ge.exec.precision_mode=must_keep_origin_dtype
-    ```
+- 全量mindir模型PA推理配置（910b_ge_prefill_pa.cfg）
 
-2. 执行命令：
+```ini
+[ascend_context]
+plugin_custom_ops=All
+provider=ge
+[ge_session_options]
+ge.exec.formatMode=1
+ge.exec.precision_mode=must_keep_origin_dtype
+ge.externalWeight=1
+ge.exec.atomicCleanPolicy=1
+ge.deterministic=1   # 注释此行，可以提升推理速度
+[ge_graph_options]
+ge.inputShape=batch_valid_length:1;tokens:1,2048;slot_mapping:2048
+[graph_kernel_param]
+opt_level=2
+disable_cluster_ops=MatMul,Reshape
+enable_cce_lib=true
+enable_cluster_ops_only="paged_attention"
+enable_expand_ops_only="paged_attention"
+disable_cce_lib_ops=MatMul
+```
+
+- 增量mindir模型PA推理配置（910b_ge_inc_pa.cfg）
+
+```ini
+[ascend_context]
+plugin_custom_ops=All
+provider=ge
+[ge_session_options]
+ge.exec.formatMode=1
+ge.exec.precision_mode=must_keep_origin_dtype
+ge.externalWeight=1
+ge.exec.atomicCleanPolicy=1
+ge.deterministic=1   # 注释此行，可以提升推理速度
+[ge_graph_options]
+ge.inputShape=batch_valid_length:-1;block_tables:-1,128;slot_mapping:-1;tokens:-1,1
+ge.dynamicDims=1,1,1,1;2,2,2,2;4,4,4,4
+ge.dynamicNodeType=1
+[graph_kernel_param]
+opt_level=2
+disable_cluster_ops=MatMul,Reshape
+enable_cce_lib=true
+enable_cluster_ops_only="paged_attention"
+enable_expand_ops_only="paged_attention"
+disable_cce_lib_ops=MatMul
+```
+
+2. 执行run_infer_main.py脚本，修改相关配置启动推理：
+
+- PA推理执行命令如下：
 
 ```bash
-python run_infer_main.py --device_id 0 --model_name glm3_6b --prefill_model_path glm3_export/glm3_6b_prefill_seq512_graph.mindir --increment_model_path glm3_export/glm3_6b_inc_seq512_graph.mindir --config_path lite.ini --is_sample_acceleration False --seq_length 512 --add_special_tokens True
+python run_infer_main.py
+--batch_size 1
+--device_id 0
+--model_name glm3
+--prefill_model_path /path/to/mindir_full_checkpoint/rank_0_graph.mindir
+--increment_model_path /path/to/mindir_inc_checkpoint/rank_0_graph.mindir
+--tokenizer_path /path/to/glm3_6b/tokenizer.model
+--config_path "configs/glm3/910b_ge_prefill_pa.cfg,configs/glm3/910b_ge_inc_pa.cfg"
+--seq_length 2048
+--max_length 2048
+--dynamic False
+--paged_attention True
+--pa_block_size 16
+--pa_num_blocks 224
+
+# 参数说明
+batch_size: 推理多batch设置
+device_id: 设备物理ID
+model_name: 模型名称
+prefill_model_path: 全量图路径
+increment_model_path: 增量图路径
+tokenizer_path: 模型tokenizer路径
+config_path: GE配置文件路径
+seq_length: 推理序列长度
+max_length: 能够生成的最大语句长度
+dynamic: 是否采用双动态推理,执行PA推理时设置为False
+paged_attention: 是否执行PA推理
+pa_block_size: PA推理的参数
+pa_num_blocks: PA推理的参数
 ```
+
+#### 模型推理结果
 
 　　等待模型载入、编译后，出现：
 
@@ -804,63 +887,135 @@ Please enter your predict data:
 ['[gMASK]sop<|user|> \n 你好<|assistant|> \n 你好👋！我是人工智能助手 ChatGLM3-6B，很高兴见到你，欢迎问我任何问题。']
 ```
 
-## Q & A
+### 多batch推理流程（以batch_size=4为例）
 
-### Q1: 网络训练 loss 不下降、网络训练溢出、`overflow_cond=True` 怎么办？
+#### Step1. MindIR 导出
 
-A1: 执行训练前设置环境变量：
+1. 修改模型相关的配置文件 configs/glm3/export_glm3_6b_pa.yaml，其中需要关注这几项：
 
-```bash
-export MS_ASCEND_CHECK_OVERFLOW_MODE="INFNAN_MODE"
+```yaml
+# model config
+model:
+  model_config:
+    type: ChatGLM2Config
+    batch_size: 4         # 此处设置batch size值
 ```
 
-重新启动训练。
+2. 执行run_mindformer.py，完成模型转换
 
-### Q2: 推理速度非常慢、Mindspore只能跑在CPU上、报错中含有 `te`、`tbe`、`tvm`等字样？
+执行run_mindformer.py，完成MindIR导出，得到全量minder_full_checkpoint/rank_0_graph.mindir和增量minder_inc_checkpoint/rank_0_graph.mindir两个MindIR图
 
-A2: 一般是 Mindspore + Ascend 环境安装问题，确认环境安装过程参照
-[安装指南](https://www.mindspore.cn/install/#%E6%89%8B%E5%8A%A8%E5%AE%89%E8%A3%85)并且成功设置了环境变量。执行：
+```bash
+python run_mindformer.py \
+--config configs/glm3/export_glm3_6b_pa.yaml \
+--run_mode export \
+--use_parallel False \
+--batch_size 4 \
+--device_id 0
+```
+
+#### Step2. 执行MS Lite推理
+
+新建推理配置文件，ChatGLM3-6B在Atlas 800T A2上推荐的GE配置如下：
+
+1. 全量和增量的GE配置不同，如下所示
+
+- 全量mindir模型PA推理配置（910b_ge_prefill_pa.cfg）：slot_mapping的值等于batch_size*seq_len=4*2048
+
+```ini
+[ascend_context]
+plugin_custom_ops=All
+provider=ge
+[ge_session_options]
+ge.exec.formatMode=1
+ge.exec.precision_mode=must_keep_origin_dtype
+ge.externalWeight=1
+ge.exec.atomicCleanPolicy=1
+ge.deterministic=1   # 注释此行，可以提升推理速度
+[ge_graph_options]
+ge.inputShape=batch_valid_length:4;tokens:4,2048;slot_mapping:8192
+[graph_kernel_param]
+opt_level=2
+disable_cluster_ops=MatMul,Reshape
+enable_cce_lib=true
+enable_cluster_ops_only="paged_attention"
+enable_expand_ops_only="paged_attention"
+disable_cce_lib_ops=MatMul
+```
+
+- 增量mindir模型PA推理配置（910b_ge_inc_pa.cfg）
+
+```ini
+[ascend_context]
+plugin_custom_ops=All
+provider=ge
+[ge_session_options]
+ge.exec.formatMode=1
+ge.exec.precision_mode=must_keep_origin_dtype
+ge.externalWeight=1
+ge.exec.atomicCleanPolicy=1
+ge.deterministic=1   # 注释此行，可以提升推理速度
+[ge_graph_options]
+ge.inputShape=batch_valid_length:-1;block_tables:-1,128;slot_mapping:-1;tokens:-1,1
+ge.dynamicDims=1,1,1,1;2,2,2,2;4,4,4,4
+ge.dynamicNodeType=1
+[graph_kernel_param]
+opt_level=2
+disable_cluster_ops=MatMul,Reshape
+enable_cce_lib=true
+enable_cluster_ops_only="paged_attention"
+enable_expand_ops_only="paged_attention"
+disable_cce_lib_ops=MatMul
+```
+
+2. 执行run_infer_main.py脚本，修改相关配置启动推理：
+
+- PA推理执行命令如下：
+
+```bash
+python run_infer_main.py \
+--batch_size 4 \
+--device_id 0 \
+--model_name glm3 \
+--prefill_model_path /path/to/mindir_full_checkpoint/rank_0_graph.mindir \
+--increment_model_path /path/to/mindir_inc_checkpoint/rank_0_graph.mindir \
+--tokenizer_path /path/to/glm3_6b/tokenizer.model \
+--config_path "configs/glm3/910b_ge_prefill_pa.cfg,configs/glm3/910b_ge_inc_pa.cfg" \
+--seq_length 2048 \
+--max_length 2048 \
+--dynamic False \
+--paged_attention True \
+--pa_block_size 16 \
+--pa_num_blocks 224
+
+# 参数说明
+batch_size: 推理多batch设置
+```
+
+**注：** 为适配batch_size=4，需要修改run_infer_main.py部分代码，如下所示：
 
 ```python
-python -c "import mindspore;mindspore.set_context(device_target='Ascend');mindspore.run_check()"
+def infer_main(args_):
+    ...
+    if args_.distributed:
+        ...
+    else:
+        while True:
+        user_input = input("Please enter your predict data: \n")
+        if user_input == "exit":
+            print("Task is over.")
+            sys.exit()
+        user_input = [user_input] * args_.batch_size   # 此处新增一行代码，用于多batch推理
+        ...
 ```
 
-假如执行输出：
+### CEVAL开源数据集评测
 
-```bash
-MindSpore version: 版本号
-The result of multiplication calculation is correct, MindSpore has been installed on platform [Ascend] successfully!
-```
+#### 评测结果
 
-并且没有报错，则说明成功安装了环境。
+|                                 | Average Accuary |
+|---------------------------------|-----------------|
+| Atlas 800T A2 + Mindspore (PA推理) | 51.41           |
+| A100 + Pytorch                  | 51.43           |
 
-或许你想问，有没有更方便的环境安装方式？恭喜你，有的，我们还提供现成的
-[docker镜像](http://mirrors.cn-central-221.ovaijisuan.com/mirrors.html)，可以依据需求自行取用。
-
-### Q3: Sync stream Failed、exec graph xxx failed？
-
-A3:这类报错较为宽泛，可以打开昇腾host日志进一步定位。
-
-```bash
-export ASCEND_GLOBAL_EVENT_ENABLE=0
-export ASCEND_GLOBAL_LOG_LEVEL=2
-export ASCEND_SLOG_PRINT_TO_STDOUT=1
-```
-
-打开昇腾host日志后模型性能将明显下降，定位问题结束后需要取消昇腾日志：
-
-```bash
-unset ASCEND_GLOBAL_EVENT_ENABLE ASCEND_GLOBAL_LOG_LEVEL ASCEND_SLOG_PRINT_TO_STDOUT
-```
-
-### Q4: the strategy is xxxxxx, shape xxxx cannot be divisible by value x
-
-A4: 检查模型句长是否满足 `max_source_length + max_target_length + 1 = seq_length` 的要求。
-
-### 仍然有疑问？欢迎向我们提出issue，我们将尽快为您解决
-
-提问时麻烦提供以下信息：
-
-1. 执行命令
-2. 运行环境，包括硬件版本、CANN版本、Mindspore版本、Mindformers版本
-3. 报错完整日志
+**注：** 评测结果是基于开源的预训练模型
