@@ -20,7 +20,7 @@ import os
 import regex as re
 
 from mindformers.tools.register import MindFormerRegister, MindFormerModuleType
-from mindformers.models.tokenization_utils import PreTrainedTokenizer
+from mindformers.models.base_tokenizer import Tokenizer
 
 
 __all__ = ['WizardCoderTokenizer']
@@ -57,7 +57,7 @@ def get_pairs(word):
 
 
 @MindFormerRegister.register(MindFormerModuleType.TOKENIZER)
-class WizardCoderTokenizer(PreTrainedTokenizer):
+class WizardCoderTokenizer(Tokenizer):
     r"""
     Tokenize the input string and convert them into the ids. The tokenizer use the sentence piece internally.
 

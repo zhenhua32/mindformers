@@ -15,10 +15,10 @@
 """MindFormers Pipeline API."""
 from .pipeline import pipeline
 from .build_pipeline import build_pipeline
-from .base_pipeline import Pipeline
+from .base_pipeline import BasePipeline
 from .image_classification_pipeline import ImageClassificationPipeline
 from .zero_shot_image_classification_pipeline import ZeroShotImageClassificationPipeline
-from .image_to_text_generation_pipeline import ImageToTextPipeline
+from .image_to_text_generation_pipeline import ImageToTextGenerationPipeline
 from .translation_pipeline import TranslationPipeline
 from .fill_mask_pipeline import FillMaskPipeline
 from .text_classification_pipeline import TextClassificationPipeline
@@ -32,7 +32,7 @@ from .segment_anything_pipeline import SegmentAnythingPipeline
 __all__ = ['ZeroShotImageClassificationPipeline',
            'ImageClassificationPipeline',
            'pipeline',
-           'Pipeline']
+           'BasePipeline']
 
 __all__.extend(translation_pipeline.__all__)
 __all__.extend(fill_mask_pipeline.__all__)

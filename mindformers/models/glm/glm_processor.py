@@ -19,22 +19,21 @@ GLMProcessor
 import re
 
 from mindformers.mindformer_book import MindFormerBook
-from mindformers.models.tokenization_utils_base import PreTrainedTokenizerBase
-from mindformers.models.processing_utils import ProcessorMixin
+from mindformers.models.base_tokenizer import BaseTokenizer
+from mindformers.models.base_processor import BaseProcessor
 from mindformers.tools.register import MindFormerRegister, MindFormerModuleType
-
 
 __all__ = ['GLMProcessor']
 
 
 @MindFormerRegister.register(MindFormerModuleType.PROCESSOR)
-class GLMProcessor(ProcessorMixin):
+class GLMProcessor(BaseProcessor):
     """
     GLM processor,
-    consists of a tokenizer (PreTrainedTokenizerBase) for text input.
+    consists of a tokenizer (BaseTokenizer) for text input.
 
     Args:
-        tokenizer (Optional[PreTrainedTokenizerBase]): text tokenizer for glm.
+        tokenizer (Optional[BaseTokenizer]): text tokenizer for glm.
         max_length (`int`, *optional*):
             Controls the maximum length to use by one of the truncation/padding parameters.
 
@@ -58,9 +57,6 @@ class GLMProcessor(ProcessorMixin):
     """
     _support_list = MindFormerBook.get_processor_support_list()['glm']
 
-    attributes = ["tokenizer"]
-    tokenizer_class = "ChatGLMTokenizer"
-
     def __init__(self, tokenizer=None,
                  max_length=128, padding='max_length', return_tensors='ms'):
         super(GLMProcessor, self).__init__(
@@ -74,8 +70,8 @@ class GLMProcessor(ProcessorMixin):
         """call function"""
         output = {}
         if text_input is not None and self.tokenizer:
-            if not isinstance(self.tokenizer, PreTrainedTokenizerBase):
-                raise TypeError(f"tokenizer should inherited from the PreTrainedTokenizerBase,"
+            if not isinstance(self.tokenizer, BaseTokenizer):
+                raise TypeError(f"tokenizer should inherited from the BaseTokenizer,"
                                 f" but got {type(self.tokenizer)}.")
             # Format the input into a batch
             if isinstance(text_input, str):

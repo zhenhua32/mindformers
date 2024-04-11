@@ -39,25 +39,15 @@ from mindformers.modules.transformer.transformer import default_transformer_conf
     EmbeddingOpParallelConfig, OpParallelConfig
 from mindformers.core.loss import CrossEntropyLoss
 from mindformers.modules import VocabEmbedding
-from mindformers.models.modeling_utils import PreTrainedModel
 
 from .t5_config import T5Config
 
+from ..base_model import BaseModel
 from ...tools import logger
 from ...tools.register import MindFormerRegister, MindFormerModuleType
 from ...mindformer_book import MindFormerBook
 
 __all__ = ['T5ForConditionalGeneration']
-
-
-class T5PreTrainedModel(PreTrainedModel):
-    """
-    An abstract class to handle weights initialization and a simple interface for downloading and loading pretrained
-    models.
-    """
-
-    config_class = T5Config
-    base_model_prefix = "t5"
 
 
 class LayerNorm(nn.Cell):
@@ -1530,7 +1520,7 @@ class T5Head(nn.Cell):
         return logits
 
 
-class T5Model(T5PreTrainedModel):
+class T5Model(BaseModel):
     """
     T5Model with encoder and decoder.
 
@@ -1693,7 +1683,7 @@ class T5Model(T5PreTrainedModel):
 
 
 @MindFormerRegister.register(MindFormerModuleType.MODELS)
-class T5ForConditionalGeneration(T5PreTrainedModel):
+class T5ForConditionalGeneration(BaseModel):
     """
     A T5 model with the loss added.
 

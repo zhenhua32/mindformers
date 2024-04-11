@@ -15,24 +15,26 @@
 
 
 """Blip2 Config API"""
-from typing import Optional, Union
+from typing import Optional
 
-from mindspore._checkparam import args_type_check
 import mindspore.common.dtype as mstype
 
 from mindformers.models.blip2.qformer_config import QFormerConfig
 from mindformers.models.llama import LlamaConfig
 from mindformers.models.vit import ViTConfig
 from mindformers.tools.register import MindFormerRegister, MindFormerModuleType
-from mindformers.models.configuration_utils import PretrainedConfig
+from mindformers.models.base_config import BaseConfig
 from mindformers.mindformer_book import MindFormerBook
-from mindformers.modules.transformer.transformer import default_transformer_config, TransformerOpParallelConfig
+from mindformers.modules.transformer import TransformerOpParallelConfig, TransformerRecomputeConfig
 
 __all__ = ['Blip2Config']
 
+default_recompute_config = TransformerRecomputeConfig()
+default_parallel_config = TransformerOpParallelConfig(recompute=default_recompute_config)
+
 
 @MindFormerRegister.register(MindFormerModuleType.CONFIG)
-class Blip2Config(PretrainedConfig):
+class Blip2Config(BaseConfig):
     r"""
     Config For BLIP2 Module
 
@@ -74,12 +76,8 @@ class Blip2Config(PretrainedConfig):
     Returns:
         Class, Blip2Config.
     """
-
-    model_type = "blip2"
     _support_list = MindFormerBook.get_config_support_list()['blip2']
 
-    @args_type_check(parallel_config=(dict, TransformerOpParallelConfig),
-                     qformer_config=(dict, QFormerConfig))
     def __init__(self,
                  model_type: str = "blip2",
                  batch_size: int = 8,
@@ -93,18 +91,14 @@ class Blip2Config(PretrainedConfig):
                  compute_dtype: str = "float16",
                  layernorm_compute_type: str = "float32",
                  softmax_compute_type: str = "float32",
-                 vision_config: Optional[ViTConfig] = ViTConfig(),
-                 qformer_config: Union[dict, QFormerConfig] = QFormerConfig(),
+                 vision_config: Optional[ViTConfig] = None,
+                 qformer_config: Optional[QFormerConfig] = None,
                  text_config: Optional[LlamaConfig] = None,
-                 parallel_config: Union[dict, TransformerOpParallelConfig] = default_transformer_config,
+                 parallel_config: TransformerOpParallelConfig = default_parallel_config,
                  is_training: bool = True,
                  micro_batch_interleave_num=1,
                  **kwargs):
         super(Blip2Config, self).__init__(**kwargs)
-        if isinstance(parallel_config, dict):
-            parallel_config = TransformerOpParallelConfig(**parallel_config)
-        if isinstance(qformer_config, dict):
-            qformer_config = QFormerConfig(**qformer_config)
         self.model_type = model_type
         self.batch_size = batch_size
         self.freeze_vision = freeze_vision
@@ -122,8 +116,8 @@ class Blip2Config(PretrainedConfig):
         self.is_training = is_training
         self.micro_batch_interleave_num = micro_batch_interleave_num
 
-        self.vision_config = vision_config
-        self.qformer_config = qformer_config
+        self.vision_config = vision_config if vision_config is not None else ViTConfig()
+        self.qformer_config = QFormerConfig(**qformer_config) if qformer_config is not None else QFormerConfig()
 
         self.text_config = text_config
 

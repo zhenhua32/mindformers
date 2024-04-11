@@ -30,7 +30,7 @@ from mindformers.tools.utils import try_sync_file
 from ...mindformer_book import MindFormerBook
 from ...tools.register import MindFormerRegister, MindFormerModuleType
 from ...tools.download_tools import download_with_progress_bar
-from ..tokenization_utils import PreTrainedTokenizer
+from ..base_tokenizer import Tokenizer
 
 
 __all__ = ['CLIPTokenizer']
@@ -161,7 +161,7 @@ class TempTokenizer:
 
 
 @MindFormerRegister.register(MindFormerModuleType.TOKENIZER)
-class CLIPTokenizer(PreTrainedTokenizer):
+class CLIPTokenizer(Tokenizer):
     r"""
     CLIP Tokenizer
 

@@ -455,7 +455,7 @@ class LLamaDecodeLayer(nn.Cell):
 - 核心计算逻辑如下：
 
 ```Python
-class LlamaModel(PreTrainedModel):
+class LlamaModel(BaseModel):
     .
     .
     .
@@ -492,7 +492,7 @@ class LlamaModel(PreTrainedModel):
 ```
 
 ```Python
-class LlamaForCausalLM(PreTrainedModel):
+class LlamaForCausalLM(BaseModel):
     .
     .
     .

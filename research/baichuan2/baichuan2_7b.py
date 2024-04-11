@@ -42,7 +42,7 @@ except ImportError:
     PROMPTFLASHATTENTION_VALID = False
 
 from mindformers.core.loss.loss import CrossEntropyLoss
-from mindformers.models.modeling_utils import PreTrainedModel
+from mindformers.models.base_model import BaseModel
 from mindformers.models.utils import cell_reuse
 from mindformers.modules.transformer.op_parallel_config import _check_config
 from mindformers.tools.register.register import MindFormerModuleType, MindFormerRegister
@@ -58,17 +58,7 @@ from mindformers.version_control import check_valid_flash_attention, check_valid
 __all__ = ['Baichuan7BV2ForCausalLM', 'Baichuan7BV2Model']
 
 
-class Baichuan2PreTrainedModel(PreTrainedModel):
-    """
-    An abstract class to handle weights initialization and a simple interface for downloading and loading pretrained
-    models.
-    """
-
-    config_class = LlamaConfig
-    base_model_prefix = "baichuan2"
-
-
-class Baichuan7BV2Model(Baichuan2PreTrainedModel):
+class Baichuan7BV2Model(BaseModel):
     r"""
     Transformer decoder consisting of *config.num_hidden_layers* layers. Each layer is a [`LlamaDecoderLayer`]
     Args:
@@ -330,7 +320,7 @@ class NormHead(nn.Cell):
 
 
 @MindFormerRegister.register(MindFormerModuleType.MODELS)
-class Baichuan7BV2ForCausalLM(Baichuan2PreTrainedModel):
+class Baichuan7BV2ForCausalLM(BaseModel):
     r"""
         Provide baichuan2_7b training loss or logits through network.
         Args:

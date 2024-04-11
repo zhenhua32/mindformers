@@ -32,6 +32,7 @@ import mindspore.common.initializer as weight_init_
 
 from mindformers.modules import layers, FeedForward
 from mindformers.modules.transformer.op_parallel_config import default_dpmp_config
+from mindformers.models.base_model import BaseModel
 
 
 # utils
@@ -166,7 +167,7 @@ class DropPath(nn.Cell):
         return out
 
 
-class SwinPatchEmbeddings(nn.Cell):
+class SwinPatchEmbeddings(BaseModel):
     """Construct the embeddings from patch, position embeddings."""
 
     def __init__(self, config):
@@ -210,7 +211,7 @@ class SwinPatchEmbeddings(nn.Cell):
         return x
 
 
-class SwinStage(nn.Cell):
+class SwinStage(BaseModel):
     """ Swin Basic Layer
     """
 
@@ -252,7 +253,7 @@ class SwinStage(nn.Cell):
         return f"dim={self.dim}, input_resolution={self.input_resolution}, depth={self.depth}"
 
 
-class SwinTransformerBlock(nn.Cell):
+class SwinTransformerBlock(BaseModel):
     """ Swin Transformer Block.
 
     Args:

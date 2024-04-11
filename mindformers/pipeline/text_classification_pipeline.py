@@ -14,28 +14,31 @@
 # ============================================================================
 
 """TextClassificationPipeline"""
+import os.path
 
 import numpy as np
-from mindspore import ops, Tensor
+from mindspore import ops, Tensor, Model
 
-from mindformers.mindformer_book import MindFormerBook
 from mindformers.models import GPT2ForSequenceClassification
-from mindformers.pipeline.base_pipeline import Pipeline
+from mindformers.auto_class import AutoProcessor, AutoModel
+from mindformers.mindformer_book import MindFormerBook
+from mindformers.pipeline.base_pipeline import BasePipeline
 from mindformers.tools.register import MindFormerRegister, MindFormerModuleType
+from mindformers.models import BaseModel, Tokenizer
 from mindformers.dataset.labels import labels
 
 __all__ = ['TextClassificationPipeline']
 
-
 @MindFormerRegister.register(MindFormerModuleType.PIPELINE, alias="text_classification")
-class TextClassificationPipeline(Pipeline):
+class TextClassificationPipeline(BasePipeline):
     """Pipeline for text classification
 
     Args:
-        model (Union[PretrainedModel, Model]):
-            The model used to perform task, the input should be a model instance inherited from PretrainedModel.
-        tokenizer (Optional[PreTrainedTokenizerBase]):
-            a tokenizer (None or PreTrainedTokenizer) for text processing. Default: None.
+        model (Union[str, BaseModel]):
+            The model used to perform task, the input could be a supported model name, or a model instance
+            inherited from BaseModel.
+        tokenizer (Optional[BaseTokenizer]):
+            a tokenizer (None or Tokenizer) for text processing. Default: None.
 
     Raises:
         TypeError:
@@ -64,12 +67,26 @@ class TextClassificationPipeline(Pipeline):
     _support_list = MindFormerBook.get_pipeline_support_task_list()['text_classification'].keys()
 
     def __init__(self, model, tokenizer=None, **kwargs):
+        if isinstance(model, str):
+            if model in self._support_list or os.path.isdir(model):
+                if tokenizer is None:
+                    tokenizer = AutoProcessor.from_pretrained(model).tokenizer
+                model = AutoModel.from_pretrained(model)
+                if not isinstance(tokenizer, Tokenizer):
+                    raise TypeError(f"tokenizer should be inherited from"
+                                    f" BaseTokenizer, but got {type(tokenizer)}.")
+            else:
+                raise ValueError(f"{model} is not supported by {self.__class__.__name__},"
+                                 f"please selected from {self._support_list}.")
+
+        if not isinstance(model, (BaseModel, Model)):
+            raise TypeError(f"model should be inherited from BaseModel or Model, but got type {type(model)}.")
 
         if tokenizer is None:
             raise ValueError(f"{self.__class__.__name__}"
                              " requires for a tokenizer.")
 
-        super().__init__(model, tokenizer=tokenizer, **kwargs)
+        super().__init__(model, tokenizer, **kwargs)
 
     def _sanitize_parameters(self, **pipeline_parameters):
         """sanitize parameters for preprocess, forward, and postprocess."""
@@ -167,7 +184,7 @@ class TextClassificationPipeline(Pipeline):
                 "token_type_id": expand_dims(inputs_final["token_type_ids"], 0),
                 "label_ids": None}
 
-    def _forward(self, model_inputs, **forward_params):
+    def forward(self, model_inputs, **forward_params):
         """
         Forward process
 

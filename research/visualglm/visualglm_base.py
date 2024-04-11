@@ -20,29 +20,18 @@ visualglm Base Model
 import mindspore as ms
 from mindspore.common.initializer import initializer, Normal
 
-from mindformers.models.modeling_utils import PreTrainedModel
+from mindformers.models.base_model import BaseModel
 from mindformers.models.glm import GLMConfig
 from mindformers.modules.activation import GELU
 from mindformers.modules.layers import LayerNorm
 from qformer import BertLMHeadModel
 from visualglm_glm import GLMForPreTrainingForBlip2
 from visualglm_vit import ViTModelForBlip2
-from visualglm_config import VisualGLMConfig
 
 
-class VisualGLMPreTrainedModel(PreTrainedModel):
+class VisualGLMBase(BaseModel):
     """
-    An abstract class to handle weights initialization and a simple interface for downloading and loading pretrained
-    models.
-    """
-
-    config_class = VisualGLMConfig
-    base_model_prefix = "visualglm"
-
-
-class VisualGLMBase(VisualGLMPreTrainedModel):
-    """
-    VisualGLM base model, all VisualGLM models inherit this class.
+    VisualGLM BaseModel, all VisualGLM models inherit this class.
     """
 
     def init_qformer(self):

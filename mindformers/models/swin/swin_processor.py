@@ -19,13 +19,12 @@ import numpy as np
 from PIL import Image
 
 from mindspore import Tensor
-from mindspore.dataset.vision.transforms import CenterCrop, ToTensor, Normalize
+from mindspore.dataset.vision.transforms import CenterCrop, ToTensor, Normalize, Rescale
 
 from mindformers.mindformer_book import MindFormerBook
 from mindformers.dataset import Resize
 from mindformers.dataset.base_dataset import BaseDataset
-from mindformers.models.processing_utils import ProcessorMixin
-from mindformers.models.image_processing_utils import BaseImageProcessor
+from mindformers.models.base_processor import BaseProcessor, BaseImageProcessor
 from mindformers.tools.register import MindFormerRegister, MindFormerModuleType
 
 
@@ -40,21 +39,13 @@ class SwinImageProcessor(BaseImageProcessor):
     Args:
         image_resolution (int): the target size.
     """
-    def __init__(self,
-                 size=224,
-                 resize=256,
-                 mean=(0.485, 0.456, 0.406),
-                 std=(0.229, 0.224, 0.225),
-                 is_hwc=False,
-                 interpolation='cubic',
-                 **kwargs):
-        super().__init__(**kwargs)
-        self.size = size
-        self.resize = resize
-        self.mean = mean
-        self.std = std
-        self.is_hwc = is_hwc
-        self.interpolation = interpolation
+    def __init__(self, size=224):
+        super(SwinImageProcessor, self).__init__(image_resolution=size)
+        self.resize = Resize(256, interpolation='cubic')
+        self.center_crop = CenterCrop(size)
+        self.to_tensor = ToTensor()
+        self.rescale = Rescale(1.0 / 255.0, 0.0)
+        self.normalize = Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225], is_hwc=False)
 
     def preprocess(self, images, **kwargs):
         """
@@ -66,19 +57,14 @@ class SwinImageProcessor(BaseImageProcessor):
         Return:
             A 4-rank tensor for a batch of images.
         """
-        resize = Resize(self.resize, interpolation=self.interpolation)
-        center_crop = CenterCrop(self.size)
-        to_tensor = ToTensor()
-        normalize = Normalize(mean=self.mean, std=self.std, is_hwc=self.is_hwc)
-
         images = self._format_inputs(images)
 
         res = []
         for image in images:
-            image = resize(image)
-            image = center_crop(image)
-            image = to_tensor(image)
-            image = normalize(image)
+            image = self.resize(image)
+            image = self.center_crop(image)
+            image = self.to_tensor(image)
+            image = self.normalize(image)
             res.append(image)
         return Tensor(res)
 
@@ -129,7 +115,7 @@ class SwinImageProcessor(BaseImageProcessor):
 
 
 @MindFormerRegister.register(MindFormerModuleType.PROCESSOR)
-class SwinProcessor(ProcessorMixin):
+class SwinProcessor(BaseProcessor):
     """
     Swin processor,
     consists of a feature extractor (BaseFeatureEXtractor) for image input.
@@ -151,37 +137,8 @@ class SwinProcessor(ProcessorMixin):
     """
     _support_list = MindFormerBook.get_processor_support_list()['swin']
 
-    attributes = ["image_processor"]
-    image_processor_class = "SwinImageProcessor"
-
     def __init__(self, image_processor=None, return_tensors='ms'):
         super(SwinProcessor, self).__init__(
             image_processor=image_processor,
             return_tensors=return_tensors
         )
-
-    def __call__(self, image_input=None, text_input=None):
-        """call function"""
-        output = {}
-
-        if image_input is not None and self.image_processor:
-            if not isinstance(self.image_processor, BaseImageProcessor):
-                raise TypeError(f"feature_extractor should inherit from the BaseImageProcessor,"
-                                f" but got {type(self.image_processor)}.")
-
-            image_output = self.image_processor(image_input)
-            output['image'] = image_output
-
-        if text_input is not None and self.tokenizer:
-            if not isinstance(self.tokenizer, PreTrainedTokenizerBase):
-                raise TypeError(f"tokenizer should inherited from the from PreTrainedTokenizerBase,"
-                                f" but got {type(self.tokenizer)}.")
-            # Format the input into a batch
-            if isinstance(text_input, str):
-                text_input = [text_input]
-            text_output = self.tokenizer(text_input, return_tensors=self.return_tensors,
-                                         max_length=self.max_length,
-                                         padding=self.padding)["input_ids"]
-            output['text'] = text_output
-
-        return output

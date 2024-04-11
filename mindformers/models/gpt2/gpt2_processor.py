@@ -17,19 +17,19 @@
 GPT2Processor
 """
 from mindformers.mindformer_book import MindFormerBook
-from mindformers.models.tokenization_utils_base import PreTrainedTokenizerBase
-from mindformers.models.processing_utils import ProcessorMixin
-from mindformers.tools.register import MindFormerRegister, MindFormerModuleType
+from ..base_tokenizer import BaseTokenizer
+from ..base_processor import BaseProcessor
+from ...tools.register import MindFormerRegister, MindFormerModuleType
 
 __all__ = ['GPT2Processor']
 
 @MindFormerRegister.register(MindFormerModuleType.PROCESSOR)
-class GPT2Processor(ProcessorMixin):
+class GPT2Processor(BaseProcessor):
     """
     GPT2 processor,
-    consists of a tokenizer (PreTrainedTokenizerBase) for text input.
+    consists of a tokenizer (BaseTokenizer) for text input.
     Args:
-        tokenizer (PreTrainedTokenizerBase): The tokenizer of GPTModel.
+        tokenizer (BaseTokenizer): The tokenizer of GPTModel.
         max_length (`int`, *optional*, defaults to 128):
             The maximum length (in number of tokens) for the inputs to GPTModel.
         padding (`str`, *optional*, defaults to `max_length`):
@@ -49,9 +49,6 @@ class GPT2Processor(ProcessorMixin):
     """
     _support_list = MindFormerBook.get_processor_support_list()['gpt2']
 
-    attributes = ["tokenizer"]
-    tokenizer_class = ("GPT2Tokenizer", "GPT2TokenizerFast")
-
     def __init__(self, tokenizer=None,
                  max_length=128, padding='max_length', return_tensors='ms'):
         super(GPT2Processor, self).__init__(
@@ -65,8 +62,8 @@ class GPT2Processor(ProcessorMixin):
         """call function"""
         output = {}
         if text_input is not None and self.tokenizer:
-            if not isinstance(self.tokenizer, PreTrainedTokenizerBase):
-                raise TypeError(f"tokenizer should inherited from the PreTrainedTokenizerBase,"
+            if not isinstance(self.tokenizer, BaseTokenizer):
+                raise TypeError(f"tokenizer should inherited from the BaseTokenizer,"
                                 f" but got {type(self.tokenizer)}.")
             # Format the input into a batch
             if isinstance(text_input, str):

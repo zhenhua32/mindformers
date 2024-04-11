@@ -35,6 +35,7 @@ from mindformers.pet.tuners.pet_adapter import PetAdapter
 from mindformers.version_control import get_tril, check_valid_paged_attention
 from mindformers.modules import KVCachePreprocess
 
+from ..base_model import BaseModel
 from ..utils import cell_reuse
 from .glm2_config import ChatGLM2Config
 from .glm2_modules import RopeCache
@@ -199,7 +200,7 @@ class ChatGLM2Model(nn.Cell):
 
 
 @MindFormerRegister.register(MindFormerModuleType.MODELS)
-class ChatGLM2ForConditionalGeneration(GLM2PreTrainedModel):
+class ChatGLM2ForConditionalGeneration(BaseModel):
     r"""
     Provide gpt training loss or logits through network.
 

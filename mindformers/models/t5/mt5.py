@@ -29,7 +29,8 @@ from mindformers.modules.transformer.transformer import (
 
 from ...mindformer_book import MindFormerBook
 from ...tools.register import MindFormerModuleType, MindFormerRegister
-from .t5 import T5Config, T5Model, T5PreTrainedModel
+from ..base_model import BaseModel
+from .t5 import T5Config, T5Model
 
 __all__ = ["MT5ForConditionalGeneration"]
 
@@ -197,7 +198,7 @@ class MT5Model(T5Model):
 
 
 @MindFormerRegister.register(MindFormerModuleType.MODELS)
-class MT5ForConditionalGeneration(T5PreTrainedModel):
+class MT5ForConditionalGeneration(BaseModel):
     """
     An MT5 model with the loss added.
 

@@ -38,11 +38,11 @@ from mindspore.common import initializer as init
 
 from mindformers.mindformer_book import MindFormerBook
 from mindformers.core import build_lr, build_optim, build_callback, build_metric
-from mindformers.core.callback.callback import EvalCallBack, CheckpointMointor
+from mindformers.core.callback.callback import EvalCallBack
 from mindformers.core.parallel_config import build_parallel_config
 from mindformers.dataset import build_dataset, check_dataset_config, BaseDataset
 from mindformers.models import build_model, build_processor, build_tokenizer, \
-    PreTrainedModel, PreTrainedTokenizerBase, BaseImageProcessor
+    BaseModel, BaseTokenizer, BaseImageProcessor
 from mindformers.pipeline import pipeline
 from mindformers.wrapper import build_wrapper
 from mindformers.tools.register import MindFormerConfig
@@ -513,14 +513,6 @@ class BaseTrainer:
         self.callbacks.extend(build_callback(self.config.callbacks, default_args=default_args))
         return self.callbacks
 
-    def check_callback(self, callbacks):
-        """ Check callback. """
-        for callback in callbacks:
-            if isinstance(callback, CheckpointMointor):
-                callback.initial_step = self.config.runner_config.initial_step
-                callback.initial_epoch = self.config.runner_config.initial_epoch
-                callback.steps_per_epoch = self.config.data_size
-
     def create_eval_callbacks(self, default_args: dict = None):
         """Create the eval callback list for training."""
         logger.info(".........Build Callbacks for Evaluate From Config..........")
@@ -570,7 +562,7 @@ class BaseTrainer:
         """Set the attribute of network."""
         if network is None:
             raise ValueError("network is None")
-        if isinstance(network, (Cell, PreTrainedModel)):
+        if isinstance(network, (Cell, BaseModel)):
             network.set_train(is_train)
         self.network = network
 
@@ -612,7 +604,7 @@ class BaseTrainer:
     def training_process(
             self,
             config: Optional[Union[dict, MindFormerConfig, ConfigArguments, TrainingArguments]] = None,
-            network: Optional[Union[Cell, PreTrainedModel]] = None,
+            network: Optional[Union[Cell, BaseModel]] = None,
             dataset: Optional[Union[BaseDataset, GeneratorDataset]] = None,
             optimizer: Optional[Optimizer] = None,
             wrapper: Optional[TrainOneStepCell] = None,
@@ -763,7 +755,6 @@ class BaseTrainer:
                 epoch_interval=config.eval_epoch_interval if config.eval_epoch_interval else -1,
             )
             callbacks.append(eval_callback)
-        self.check_callback(callbacks)
 
         logger.info(".........Starting Training Model..........")
         if get_real_rank() % 8 == 0:
@@ -779,7 +770,7 @@ class BaseTrainer:
     def evaluate_process(
             self,
             config: Optional[Union[dict, MindFormerConfig, ConfigArguments, TrainingArguments]] = None,
-            network: Optional[Union[Cell, PreTrainedModel]] = None,
+            network: Optional[Union[Cell, BaseModel]] = None,
             dataset: Optional[Union[BaseDataset, GeneratorDataset]] = None,
             callbacks: Optional[Union[Callback, List[Callback]]] = None,
             compute_metrics: Optional[Union[dict, set]] = None,
@@ -850,8 +841,8 @@ class BaseTrainer:
                         input_data: Optional[Union[GeneratorDataset,
                                                    Tensor, np.ndarray, Image, str, list]] = None,
                         task: str = None,
-                        network: Optional[Union[Cell, PreTrainedModel]] = None,
-                        tokenizer: Optional[PreTrainedTokenizerBase] = None,
+                        network: Optional[Union[Cell, BaseModel]] = None,
+                        tokenizer: Optional[BaseTokenizer] = None,
                         image_processor: Optional[BaseImageProcessor] = None,
                         audio_processor: Optional[BaseImageProcessor] = None, **kwargs):
         """Predict for BaseTrainer in MindFormers."""
@@ -952,7 +943,7 @@ class BaseTrainer:
         return output_results
 
     def export_process(self, config: Optional[Union[dict, MindFormerConfig, ConfigArguments, TrainingArguments]] = None,
-                       network: Optional[Union[Cell, PreTrainedModel]] = None,
+                       network: Optional[Union[Cell, BaseModel]] = None,
                        **kwargs):
         '''Export for BaseTrainer in MindFormers'''
         if not self.pipeline_task:

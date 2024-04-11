@@ -21,7 +21,7 @@ import mindspore.common.dtype as mstype
 import mindspore.nn as nn
 from mindspore.ops import operations as P
 
-from mindformers.models.configuration_utils import PretrainedConfig
+from mindformers.models.base_config import BaseConfig
 
 
 class ImageTextEmbeddingConcat(nn.Cell):
@@ -51,10 +51,9 @@ class ImageTextEmbeddingPreparationMixIn:
     image text embemdding mixin
     """
 
-    def __init__(self, config: PretrainedConfig):
+    def __init__(self, config: BaseConfig):
         """init method"""
-        pad_token_id = 3 if config.pad_token_id is None else config.pad_token_id
-        self.image_text_concat = ImageTextEmbeddingConcat(pad_token_id)
+        self.image_text_concat = ImageTextEmbeddingConcat(config.get("pad_token_id", 3))
 
     def to_text_embeddings(self, text_input_ids):
         raise NotImplementedError

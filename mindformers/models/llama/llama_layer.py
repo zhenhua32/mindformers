@@ -34,9 +34,8 @@ from mindspore.common.initializer import initializer
 from mindspore.parallel._utils import _get_parallel_mode
 from mindspore.context import ParallelMode
 from mindformers.modules.layers import Linear, _check_input_dtype, _args_type_validator_check, _valid_value_checks
-from mindformers.version_control import check_valid_big_kernel
+from mindformers.version_control import check_valid_big_kernel, is_910a
 from mindformers.tools.logger import _LogActionOnce
-from mindformers.version_control import check_rmsnorm_big_kernel_valid
 
 
 class SeqExtendMethod(Enum):
@@ -83,11 +82,6 @@ class LlamaSiLU(Cell):
         else:
             self.silu.shard(strategy)
 
-    def activation_shard(self, strategy):
-        # activation_shard is the api called by moe [dp_group, expert_dim, capacity, ffn_hidden]
-        if hasattr(strategy, "expert_parallel"):
-            moe_strategy = ((strategy.data_parallel, strategy.expert_parallel, 1, strategy.model_parallel),)
-            self.shard(moe_strategy)
 
 def get_swap_mask(head_dim):
     """Swap matrix"""
@@ -350,7 +344,7 @@ class LlamaRMSNorm(nn.Cell):
         self.compute_type = compute_type
         self.weight = Parameter(initializer('ones', (dim,), dtype=mstype.float32), parallel_optimizer=False)
 
-        if check_rmsnorm_big_kernel_valid(is_dynamic):
+        if check_valid_big_kernel() and not is_910a() and not is_dynamic:
             self.norm = P.RmsNorm(eps)
             self.rms_norm = self._rms_norm
             self.self_define = False

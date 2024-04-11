@@ -15,18 +15,17 @@
 
 """
 CLIPConfig class, which consists of CLIPTextConfig and CLIPVisionConfig
-All configs here are inherited from PretrainedConfig
+All configs here are inherited from BaseConfig
 """
 from typing import Optional
 
-from mindformers.models.configuration_utils import PretrainedConfig
-from mindformers.tools.register import MindFormerRegister, MindFormerModuleType
-from mindformers.mindformer_book import MindFormerBook
-from mindformers.tools import logger
-
+from ..base_config import BaseConfig
+from ...tools.register import MindFormerRegister, MindFormerModuleType
+from ...mindformer_book import MindFormerBook
+from ...tools import logger
 
 @MindFormerRegister.register(MindFormerModuleType.CONFIG)
-class CLIPTextConfig(PretrainedConfig):
+class CLIPTextConfig(BaseConfig):
     r"""
     Config For CLIP Text Module
 
@@ -53,7 +52,6 @@ class CLIPTextConfig(PretrainedConfig):
     Returns:
         Class, CLIPTextConfig
     """
-
     def __init__(self, vocab_size: Optional[int] = 49408,
                  hidden_size: Optional[int] = 512,
                  intermediate_size: Optional[int] = 2048,
@@ -81,7 +79,7 @@ class CLIPTextConfig(PretrainedConfig):
 
 
 @MindFormerRegister.register(MindFormerModuleType.CONFIG)
-class CLIPVisionConfig(PretrainedConfig):
+class CLIPVisionConfig(BaseConfig):
     r"""
     Config For CLIP Vision Module
 
@@ -107,7 +105,6 @@ class CLIPVisionConfig(PretrainedConfig):
     Returns:
         Class, CLIPVisionConfig
     """
-
     def __init__(self, hidden_size: Optional[int] = 768,
                  intermediate_size: Optional[int] = 3072,
                  num_hidden_layers: Optional[int] = 12,
@@ -135,7 +132,7 @@ class CLIPVisionConfig(PretrainedConfig):
 
 
 @MindFormerRegister.register(MindFormerModuleType.CONFIG)
-class CLIPConfig(PretrainedConfig):
+class CLIPConfig(BaseConfig):
     r"""
     Config For CLIP Model
 
@@ -155,8 +152,6 @@ class CLIPConfig(PretrainedConfig):
     Returns:
         Class, CLIPConfig
     """
-
-    model_type = "clip"
     _support_list = MindFormerBook.get_config_support_list()['clip']
 
     def __init__(self, text_config: Optional[CLIPTextConfig] = None,

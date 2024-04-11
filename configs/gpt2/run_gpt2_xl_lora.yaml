@@ -46,9 +46,7 @@ parallel:
   full_batch: True
   search_mode: "sharding_propagation"
   enable_parallel_optimizer: True
-  strategy_ckpt_config:
-    save_file: "./ckpt_strategy.ckpt"
-    only_trainable_params: False
+  strategy_ckpt_save_file: "./ckpt_strategy.ckpt"
 parallel_config:
   data_parallel: 8
   model_parallel: 1
@@ -142,8 +140,6 @@ model:
     expand_ratio: 4
     hidden_act: "fast_gelu"
     use_flash_attention: False
-    use_prompt_flash_attention: False
-    use_incre_flash_attention: False
     hidden_dropout_rate: 0.1
     attention_dropout_rate: 0.1
     param_init_type: "float16"

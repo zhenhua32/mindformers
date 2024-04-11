@@ -14,9 +14,6 @@
 # ============================================================================
 
 """mindformers init"""
-
-__version__ = "1.1"
-
 from mindformers import core, auto_class, dataset, \
     models, modules, wrapper, tools
 from mindformers.pipeline import *
@@ -28,10 +25,10 @@ from mindformers.modules import *
 from mindformers.wrapper import *
 from mindformers.tools import *
 from mindformers.auto_class import *
-from mindformers import generation
 from mindformers.generation import *
 from mindformers.pet import *
 from .mindformer_book import MindFormerBook
+
 
 __all__ = []
 __all__.extend(dataset.__all__)

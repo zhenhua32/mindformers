@@ -69,7 +69,7 @@ class MindFormerBook:
         >>> # 1) Fill the following constant list and dict in this class
         >>> # 2) Overwrite the support_list when define a new Model or Pipeline.
         >>> @MindFormerRegister.register(MindFormerModuleType.MODELS)
-        ... class ViTForImageClassification(PreTrainedModel):
+        ... class ViTForImageClassification(BaseModel):
         ...     _support_list = MindFormerBook.get_model_support_list()['vit']
         >>> # 3) Then you can use auto class and from pretrain to init an instance.
         >>> vit_model = AutoModel.from_pretrained('vit_base_p16')
@@ -240,7 +240,7 @@ class MindFormerBook:
             ("glm2_6b", os.path.join(
                 _PROJECT_PATH, "configs/glm2/run_glm2_6b.yaml")),
             ("glm2_6b_lora", os.path.join(
-                _PROJECT_PATH, "configs/glm2/run_glm2_6b_lora_800_32G.yaml")),
+                _PROJECT_PATH, "configs/glm2/run_glm2_6b_lora.yaml")),
             ("glm2_6b_ptuning2", os.path.join(
                 _PROJECT_PATH, "configs/glm2/run_glm2_6b_ptuning2.yaml")),
             ("glm3_6b", os.path.join(
@@ -413,7 +413,7 @@ class MindFormerBook:
             ("glm2_6b", os.path.join(
                 _PROJECT_PATH, "configs/glm2/run_glm2_6b.yaml")),
             ("glm2_6b_lora", os.path.join(
-                _PROJECT_PATH, "configs/glm2/run_glm2_6b_lora_800_32G.yaml")),
+                _PROJECT_PATH, "configs/glm2/run_glm2_6b_lora.yaml")),
             ("glm2_6b_ptuning2", os.path.join(
                 _PROJECT_PATH, "configs/glm2/run_glm2_6b_ptuning2.yaml")),
             ("glm3_6b", os.path.join(
@@ -517,8 +517,7 @@ class MindFormerBook:
             'gpt2_lora',
             'gpt2_xl',
             'gpt2_xl_lora',
-            'gpt2_13b',
-            'gpt2_txtcls'
+            'gpt2_13b'
         ]),
         ('llama', [
             'llama_7b',
@@ -644,8 +643,7 @@ class MindFormerBook:
             'gpt2_lora',
             'gpt2_xl',
             'gpt2_xl_lora',
-            'gpt2_13b',
-            'gpt2_txtcls'
+            'gpt2_13b'
         ]),
         ('llama', [
             'llama_7b',
@@ -758,7 +756,7 @@ class MindFormerBook:
             'gpt2_13b'
         ]),
         ('llama', [
-            'llama_7b',
+            'llama',
         ]),
         ('pangualpha', [
             'pangualpha_2_6b',
@@ -1388,7 +1386,6 @@ class MindFormerBook:
         ('PanguAlphaTokenizer', 'PanguAlphaProcessor'),
         ('BloomTokenizer', 'BloomProcessor'),
         ('InternLMTokenizer', 'LlamaProcessor'),
-        ('BaichuanTokenizer', 'LlamaProcessor'),
         ('Baichuan2Tokenizer', 'LlamaProcessor')
     ])
 

@@ -24,14 +24,12 @@ from mindspore.dataset.vision import Inter
 from mindspore.ops import operations as P
 
 from mindformers.mindformer_book import MindFormerBook
-from mindformers.models.tokenization_utils_base import PreTrainedTokenizerBase
-from mindformers.models.image_processing_utils import BaseImageProcessor
-from mindformers.models.processing_utils import ProcessorMixin
+from mindformers.models.base_processor import BaseProcessor, BaseImageProcessor
 from mindformers.tools.register import MindFormerRegister, MindFormerModuleType
 
 
 @MindFormerRegister.register(MindFormerModuleType.PROCESSOR)
-class SamImageProcessor(BaseImageProcessor):
+class SAMImageProcessor(BaseImageProcessor):
     """
     Subclass of BaseImageProcessor implementing image preprocessing for SAM model.
 
@@ -41,15 +39,12 @@ class SamImageProcessor(BaseImageProcessor):
         std (list): Standard deviation values for image normalization.
     """
 
-    def __init__(self,
-                 img_size=1024,
-                 mean=(123.675, 116.28, 103.53),
-                 std=(58.395, 57.12, 57.375),
-                 **kwargs):
-        super().__init__(**kwargs)
+    def __init__(self, img_size=1024, mean=(123.675, 116.28, 103.53), std=(58.395, 57.12, 57.375)):
+        super().__init__()
         self.img_size = img_size
-        self.mean = mean
-        self.std = std
+        self.pixel_mean = ms.Tensor(mean).view(-1, 1, 1)
+        self.pixel_std = ms.Tensor(std).view(-1, 1, 1)
+        self.transform = ResizeLongestSide(img_size)
 
     def preprocess(self, images, **kwargs):
         """
@@ -62,18 +57,13 @@ class SamImageProcessor(BaseImageProcessor):
             image (tensor): Preprocessed image as a tensor.
             input_size (tuple): Size of the input image after preprocessing.
         """
-        pixel_mean = ms.Tensor(self.mean).view(-1, 1, 1)
-        pixel_std = ms.Tensor(self.std).view(-1, 1, 1)
-        transform = ResizeLongestSide(self.img_size)
-
-        images = np.asarray(images)
-        images = transform.apply_image(images)
+        images = self.transform.apply_image(images)
         images = images.transpose(2, 0, 1)[None, :, :, :]
         images = ms.Tensor(images)
         input_size = images.shape[-2:]
 
         # Normalize colors
-        images = (images - pixel_mean) / pixel_std
+        images = (images - self.pixel_mean) / self.pixel_std
 
         # Pad
         h, w = images.shape[-2:]
@@ -225,45 +215,16 @@ class ResizeLongestSide:
 
 
 @MindFormerRegister.register(MindFormerModuleType.PROCESSOR)
-class SamProcessor(ProcessorMixin):
+class SAMProcessor(BaseProcessor):
     """
     Vit processor,
     consists of a feature extractor (BaseFeatureEXtractor) for image input,
-    and a tokenizer (PreTrainedTokenizerBase) for text input.
+    and a tokenizer (BaseTokenizer) for text input.
     """
     _support_list = MindFormerBook.get_processor_support_list()['sam']
-
-    attributes = ["image_processor"]
-    image_processor_class = "SamImageProcessor"
 
     def __init__(self, image_processor=None, return_tensors='ms'):
         super().__init__(
             image_processor=image_processor,
             return_tensors=return_tensors
         )
-
-    def __call__(self, image_input=None, text_input=None):
-        """call function"""
-        output = {}
-
-        if image_input is not None and self.image_processor:
-            if not isinstance(self.image_processor, BaseImageProcessor):
-                raise TypeError(f"feature_extractor should inherit from the BaseImageProcessor,"
-                                f" but got {type(self.image_processor)}.")
-
-            image_output = self.image_processor(image_input)
-            output['image'] = image_output
-
-        if text_input is not None and self.tokenizer:
-            if not isinstance(self.tokenizer, PreTrainedTokenizerBase):
-                raise TypeError(f"tokenizer should inherited from the from PreTrainedTokenizerBase,"
-                                f" but got {type(self.tokenizer)}.")
-            # Format the input into a batch
-            if isinstance(text_input, str):
-                text_input = [text_input]
-            text_output = self.tokenizer(text_input, return_tensors=self.return_tensors,
-                                         max_length=self.max_length,
-                                         padding=self.padding)["input_ids"]
-            output['text'] = text_output
-
-        return output

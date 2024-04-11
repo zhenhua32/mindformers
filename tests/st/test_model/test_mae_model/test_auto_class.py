@@ -18,9 +18,9 @@ How to run this:
 pytest tests/st/test_model/test_mae_model/test_auto_class.py
 """
 import os
-import shutil
+
 from mindformers import MindFormerBook, AutoModel, AutoConfig, AutoProcessor
-from mindformers.models import PreTrainedModel, PretrainedConfig, ProcessorMixin
+from mindformers.models import BaseModel, BaseConfig, BaseProcessor
 
 
 class TestMaeAutoClassMethod:
@@ -29,10 +29,6 @@ class TestMaeAutoClassMethod:
         """setup method."""
         self.save_directory = MindFormerBook.get_default_checkpoint_save_folder()
         self.test_list = ['mae_vit_base_p16']
-
-    def teardown_method(self):
-        for model_or_config_type in self.test_list:
-            shutil.rmtree(os.path.join(self.save_directory, model_or_config_type), ignore_errors=True)
 
     def test_auto_model(self):
         """
@@ -43,7 +39,7 @@ class TestMaeAutoClassMethod:
         # input model name, load model and weights
         for model_type in self.test_list:
             model = AutoModel.from_pretrained(model_type, download_checkpoint=False)
-            assert isinstance(model, PreTrainedModel)
+            assert isinstance(model, BaseModel)
             model.save_pretrained(
                 save_directory=os.path.join(self.save_directory, model_type),
                 save_name=model_type + '_model')
@@ -57,7 +53,7 @@ class TestMaeAutoClassMethod:
         # input model config name, load model and weights
         for config_type in self.test_list:
             model_config = AutoConfig.from_pretrained(config_type)
-            assert isinstance(model_config, PretrainedConfig)
+            assert isinstance(model_config, BaseConfig)
             model_config.save_pretrained(
                 save_directory=os.path.join(self.save_directory, config_type),
                 save_name=config_type + '_config')
@@ -71,7 +67,7 @@ class TestMaeAutoClassMethod:
         # input processor name
         for processor_type in self.test_list:
             processor = AutoProcessor.from_pretrained(processor_type)
-            assert isinstance(processor, ProcessorMixin)
+            assert isinstance(processor, BaseProcessor)
             processor.save_pretrained(
                 save_directory=os.path.join(self.save_directory, processor_type),
                 save_name=processor_type + '_processor')

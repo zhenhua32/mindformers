@@ -29,7 +29,7 @@ __all__ = ['ChatGLM2Config']
 
 
 @MindFormerRegister.register(MindFormerModuleType.CONFIG)
-class ChatGLM2Config(PretrainedConfig):
+class ChatGLM2Config(BaseConfig):
     """
     ChatGLM2 model config class.
     """

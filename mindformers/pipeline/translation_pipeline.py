@@ -14,28 +14,31 @@
 # ============================================================================
 
 """TranslationPipeline"""
-from typing import Optional, Union
+import os.path
+from typing import Union, Optional
 
 import mindspore
 from mindspore import Tensor, Model
 
-from mindformers.mindformer_book import MindFormerBook
-from .base_pipeline import Pipeline
+from ..auto_class import AutoProcessor, AutoModel
+from ..mindformer_book import MindFormerBook
+from .base_pipeline import BasePipeline
 from ..tools.register import MindFormerRegister, MindFormerModuleType
-from ..models import PreTrainedModel, PreTrainedTokenizer
+from ..models import BaseModel, BaseTokenizer
 
 __all__ = ['TranslationPipeline']
 
 
 @MindFormerRegister.register(MindFormerModuleType.PIPELINE, alias="translation")
-class TranslationPipeline(Pipeline):
+class TranslationPipeline(BasePipeline):
     """Pipeline for Translation
 
     Args:
-        model (Union[PretrainedModel, Model]):
-            The model used to perform task, the input should be a model instance inherited from PretrainedModel.
-        tokenizer (Optional[PreTrainedTokenizer]):
-            A tokenizer (None or PreTrainedTokenizer) for text processing. Default: None.
+        model (Union[str, BaseModel]):
+            The model used to perform task, the input could be a supported model name, or a model instance
+            inherited from BaseModel.
+        tokenizer (Optional[BaseTokenizer]):
+            A tokenizer (None or Tokenizer) for text processing. Default: None.
         **kwargs:
             Specific parametrization of `generate_config` and/or additional model-specific kwargs that will be
             forwarded to the `forward` function of the model. Supported `generate_config` keywords can be
@@ -71,10 +74,7 @@ class TranslationPipeline(Pipeline):
 
     Examples:
         >>> from mindformers.pipeline import TranslationPipeline
-        >>> from mindformers import AutoModel, AutoTokenizer
-        >>> model = AutoModel.from_pretrained("t5_small")
-        >>> tokenizer = AutoTokenizer.from_pretrained("t5_small")
-        >>> translator = TranslationPipeline(model=model, tokenizer=tokenizer)
+        >>> translator = TranslationPipeline("t5_small")
         >>> output = translator("translate the English to Romanian: a good boy!")
         >>> print(output)
         [{'translation_text': ['un băiat bun!']}]
@@ -82,15 +82,29 @@ class TranslationPipeline(Pipeline):
     _support_list = MindFormerBook.get_model_support_list()['t5']
     return_name = 'translation'
 
-    def __init__(self, model: Union[PreTrainedModel, Model],
-                 tokenizer: Optional[PreTrainedTokenizer] = None,
+    def __init__(self, model: Union[str, BaseModel, Model],
+                 tokenizer: Optional[BaseTokenizer] = None,
                  **kwargs):
+        if isinstance(model, str):
+            if model in self._support_list or os.path.isdir(model):
+                if tokenizer is None:
+                    tokenizer = AutoProcessor.from_pretrained(model).tokenizer
+                model = AutoModel.from_pretrained(model)
+                if not isinstance(tokenizer, BaseTokenizer):
+                    raise TypeError(f"tokenizer should be inherited from"
+                                    f" BaseTokenizer, but got {type(tokenizer)}.")
+            else:
+                raise ValueError(f"{model} is not supported by {self.__class__.__name__},"
+                                 f"please selected from {self._support_list}.")
+
+        if not isinstance(model, (BaseModel, Model)):
+            raise TypeError(f"model should be inherited from BaseModel or Model, but got type {type(model)}.")
 
         if tokenizer is None:
             raise ValueError(f"{self.__class__.__name__}"
                              " requires for a tokenizer.")
 
-        super().__init__(model, tokenizer=tokenizer, **kwargs)
+        super().__init__(model, tokenizer, **kwargs)
 
     def _sanitize_parameters(self, **pipeline_parameters):
         """Sanitize Parameters
@@ -138,8 +152,8 @@ class TranslationPipeline(Pipeline):
         input_ids = self.tokenizer(inputs, return_tensors=None)["input_ids"]
         return {"input_ids": input_ids}
 
-    def _forward(self, model_inputs: dict,
-                 **forward_params):
+    def forward(self, model_inputs: dict,
+                **forward_params):
         """The Forward Process of Model
 
         Args:

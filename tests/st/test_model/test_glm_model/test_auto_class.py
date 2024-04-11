@@ -18,14 +18,14 @@ How to run this:
 pytest tests/st/test_model/test_glm_model/test_auto_class.py
 """
 import os
-import shutil
+
 from mindspore import context
 
 from mindformers import MindFormerBook
 from mindformers import AutoModel
 from mindformers import AutoConfig, AutoTokenizer, AutoProcessor
-from mindformers.models import PreTrainedModel
-from mindformers.models import PretrainedConfig, PreTrainedTokenizerBase, ProcessorMixin
+from mindformers.models import BaseModel
+from mindformers.models import BaseConfig, BaseTokenizer, BaseProcessor
 
 
 class TestGLMAutoClassMethod:
@@ -37,10 +37,6 @@ class TestGLMAutoClassMethod:
         self.save_directory = MindFormerBook.get_default_checkpoint_save_folder()
         self.test_llm_list = ["glm_6b", "glm_6b_chat"]
 
-    def teardown_method(self):
-        for model_or_config_type in self.test_llm_list:
-            shutil.rmtree(os.path.join(self.save_directory, model_or_config_type), ignore_errors=True)
-
     def test_glm_model(self):
         """
         Feature: AutoModel.
@@ -51,7 +47,7 @@ class TestGLMAutoClassMethod:
         # Too time-cost, not used for now.
         for model_type in self.test_llm_list:
             model = AutoModel.from_pretrained(model_type, download_checkpoint=False)
-            assert isinstance(model, PreTrainedModel)
+            assert isinstance(model, BaseModel)
             model.save_pretrained(
                 save_directory=os.path.join(self.save_directory, model_type),
                 save_name=model_type + "_model",
@@ -66,7 +62,7 @@ class TestGLMAutoClassMethod:
         # input model config name, load model and weights
         for config_type in self.test_llm_list:
             model_config = AutoConfig.from_pretrained(config_type)
-            assert isinstance(model_config, PretrainedConfig)
+            assert isinstance(model_config, BaseConfig)
             model_config.save_pretrained(
                 save_directory=os.path.join(self.save_directory, config_type),
                 save_name=config_type + "_config",
@@ -79,13 +75,13 @@ class TestGLMAutoClassMethod:
         Expectation: TypeError, ValueError, RuntimeError
         """
         # input processor name
-        processor_type = "glm_6b"
-        processor = AutoProcessor.from_pretrained(processor_type)
-        assert isinstance(processor, ProcessorMixin)
-        processor.save_pretrained(
-            save_directory=os.path.join(self.save_directory, processor_type),
-            save_name=processor_type + "_processor",
-        )
+        for processor_type in self.test_llm_list:
+            processor = AutoProcessor.from_pretrained(processor_type)
+            assert isinstance(processor, BaseProcessor)
+            processor.save_pretrained(
+                save_directory=os.path.join(self.save_directory, processor_type),
+                save_name=processor_type + "_processor",
+            )
 
     def test_glm_tokenizer(self):
         """
@@ -96,7 +92,7 @@ class TestGLMAutoClassMethod:
         # input processor name
         tokenizer_type = "glm_6b"
         tokenizer = AutoTokenizer.from_pretrained(tokenizer_type)
-        assert isinstance(tokenizer, PreTrainedTokenizerBase)
+        assert isinstance(tokenizer, BaseTokenizer)
         tokenizer.save_pretrained(
             save_directory=os.path.join(self.save_directory, tokenizer_type),
             save_name=tokenizer_type + "_tokenizer",

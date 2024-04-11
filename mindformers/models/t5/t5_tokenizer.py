@@ -25,9 +25,10 @@ import sentencepiece as spm
 
 from mindformers.tools import logger
 from mindformers.tools.register import MindFormerRegister, MindFormerModuleType
-from mindformers.models.tokenization_utils import PreTrainedTokenizer, AddedToken
+from mindformers.models.base_tokenizer import Tokenizer
 from mindformers.models.bert import BertTokenizer
 from ...mindformer_book import MindFormerBook
+from ..base_tokenizer import AddedToken
 from ..convert_slow_tokenizer import import_protobuf
 
 __all__ = ["T5Tokenizer", "T5PegasusTokenizer"]
@@ -38,7 +39,7 @@ SPIECE_UNDERLINE = "▁"
 
 
 @MindFormerRegister.register(MindFormerModuleType.TOKENIZER)
-class T5Tokenizer(PreTrainedTokenizer):
+class T5Tokenizer(Tokenizer):
     """
     Construct a T5 tokenizer. Based on [SentencePiece](https://github.com/google/sentencepiece).
 

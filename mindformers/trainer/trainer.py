@@ -76,8 +76,8 @@ class Trainer:
             https://mindformers.readthedocs.io/zh-cn/latest/docs/model_support_list.html#.
 
             Default: 'general'.
-        model (Optional[Union[str, PreTrainedModel]]):
-            The network for trainer. It supports model name supported or PreTrainedModel.
+        model (Optional[Union[str, BaseModel]]):
+            The network for trainer. It supports model name supported or BaseModel.
             Supported model type can refer to
             https://mindformers.readthedocs.io/zh-cn/latest/docs/model_support_list.html#.
             Default: None.
@@ -99,8 +99,8 @@ class Trainer:
         eval_dataset (Optional[Union[str, BaseDataset]]):
             The evaluate dataset. It support real dataset path or BaseDateset class or MindSpore Dataset class.
             Default: None.
-        tokenizer (Optional[PreTrainedTokenizerBase]):
-            The tokenizer for text preprocessing. It support PreTrainedTokenizerBase class.
+        tokenizer (Optional[BaseTokenizer]):
+            The tokenizer for text preprocessing. It support BaseTokenizer class.
             Default: None.
         image_processor (Optional[BaseImageProcessor]):
             The processor for image preprocessing. It supports BaseImageProcessor class.
@@ -131,19 +131,19 @@ class Trainer:
         KeyError: If 'task' or 'model' not in supported trainer.
     """
     @args_type_check(
-        args=(str, MindFormerConfig, TrainingArguments), task=str, model=(str, PreTrainedModel),
+        args=(str, MindFormerConfig, TrainingArguments), task=str, model=(str, BaseModel),
         model_name=str, train_dataset=(str, BaseDataset, Dataset), eval_dataset=(str, BaseDataset, Dataset),
-        tokenizer=PreTrainedTokenizerBase, image_processor=BaseImageProcessor, audio_processor=BaseAudioProcessor,
+        tokenizer=BaseTokenizer, image_processor=BaseImageProcessor, audio_processor=BaseAudioProcessor,
         optimizers=Optimizer, wrapper=TrainOneStepCell, pet_method=str, callbacks=(Callback, list),
         eval_callbacks=(Callback, list), compute_metrics=(dict, set), save_config=bool)
     def __init__(self,
                  args: Optional[Union[str, MindFormerConfig, TrainingArguments]] = None,
                  task: Optional[str] = 'general',
-                 model: Optional[Union[str, PreTrainedModel]] = None,
+                 model: Optional[Union[str, BaseModel]] = None,
                  model_name: Optional[Union[str]] = None,
                  train_dataset: Optional[Union[str, BaseDataset]] = None,
                  eval_dataset: Optional[Union[str, BaseDataset]] = None,
-                 tokenizer: Optional[PreTrainedTokenizerBase] = None,
+                 tokenizer: Optional[BaseTokenizer] = None,
                  image_processor: Optional[BaseImageProcessor] = None,
                  audio_processor: Optional[BaseAudioProcessor] = None,
                  optimizers: Optional[Optimizer] = None,
@@ -201,7 +201,7 @@ class Trainer:
             raise ValueError(
                 "The value of task must be in {}, but get {}".format(SUPPORT_TASKS.keys(), task))
 
-        if isinstance(self.model, (Cell, PreTrainedModel)):
+        if isinstance(self.model, (Cell, BaseModel)):
             logger.info("The model instance has been entered, "
                         "and the model will not be created from model_config")
             if pet_method:
@@ -865,7 +865,7 @@ class Trainer:
         if self.is_set_moe_config:
             logger.info("The incoming model will be configured in moe.")
 
-        if not isinstance(self.model, PreTrainedModel):
+        if not isinstance(self.model, BaseModel):
             raise NotImplementedError("Currently only the integrated model structure in MindFormers is supported.")
 
         build_parallel_config(self.config)
@@ -927,10 +927,10 @@ class Trainer:
                 logger.info("not load parameters is: %s", str(not_load_params))
             elif is_checkpoint_name:
                 logger.info("now input valid checkpoint name, it will load to network.")
-                if isinstance(self.model, (Cell, PreTrainedModel)):
+                if isinstance(self.model, (Cell, BaseModel)):
                     self.model.load_checkpoint(self.config.model.model_config)
                 else:
-                    logger.warning("model must be PreTrainedModel or Cell type, but get %s", type(self.model))
+                    logger.warning("model must be BaseModel or Cell type, but get %s", type(self.model))
             else:
                 logger.warning("input checkpoint args is invalid, "
                                "it must be valid and real checkpoint path or a valid checkpoint name,"

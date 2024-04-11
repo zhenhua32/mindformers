@@ -16,21 +16,21 @@
 """
 T5Processor
 """
-from mindformers.models.tokenization_utils_base import PreTrainedTokenizerBase
+from mindformers.models.base_tokenizer import Tokenizer
 from mindformers.mindformer_book import MindFormerBook
-from mindformers.models.processing_utils import ProcessorMixin
-from mindformers.tools.register import MindFormerRegister, MindFormerModuleType
+from ..base_processor import BaseProcessor
+from ...tools.register import MindFormerRegister, MindFormerModuleType
 
 __all__ = ['T5Processor']
 
 @MindFormerRegister.register(MindFormerModuleType.PROCESSOR)
-class T5Processor(ProcessorMixin):
+class T5Processor(BaseProcessor):
     """
     T5 processor,
-    consists of a tokenizer (PreTrainedTokenizerBase) for text input.
+    consists of a tokenizer (BaseTokenizer) for text input.
 
     Args:
-        tokenizer (PreTrainedTokenizerBase): The tokenizer of T5.
+        tokenizer (BaseTokenizer): The tokenizer of T5.
         max_length (`int`, *optional*, defaults to 77):
             The maximum length (in number of tokens) for the inputs to T5Model.
         tgt_max_length (`int`, *optional*, defaults to 128):
@@ -52,9 +52,6 @@ class T5Processor(ProcessorMixin):
     """
     _support_list = MindFormerBook.get_processor_support_list()['t5']
 
-    attributes = ["tokenizer"]
-    tokenizer_class = ("T5Tokenizer", "T5TokenizerFast")
-
     def __init__(self, tokenizer=None,
                  max_length=77,
                  tgt_max_length=128,
@@ -72,8 +69,8 @@ class T5Processor(ProcessorMixin):
         output = {}
         if not self.tokenizer:
             raise ValueError(f"For {self.__name__}, the `tokenizer` should not be None.")
-        if not isinstance(self.tokenizer, PreTrainedTokenizerBase):
-            raise TypeError(f"tokenizer should inherited from the PreTrainedTokenizerBase,"
+        if not isinstance(self.tokenizer, Tokenizer):
+            raise TypeError(f"tokenizer should inherited from the BaseTokenizer,"
                             f" but got {type(self.tokenizer)}.")
         if text_input:
             # Format the input into a batch

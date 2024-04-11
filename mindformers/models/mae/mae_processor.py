@@ -24,9 +24,7 @@ from mindspore.dataset.vision.transforms import ToTensor, Normalize
 from mindformers.mindformer_book import MindFormerBook
 from mindformers.dataset import Resize
 from mindformers.dataset.base_dataset import BaseDataset
-from mindformers.models.tokenization_utils_base import PreTrainedTokenizerBase
-from mindformers.models.image_processing_utils import BaseImageProcessor
-from mindformers.models.processing_utils import ProcessorMixin
+from mindformers.models.base_processor import BaseProcessor, BaseImageProcessor
 from mindformers.tools.register import MindFormerRegister, MindFormerModuleType
 
 
@@ -43,24 +41,11 @@ class ViTMAEImageProcessor(BaseImageProcessor):
         patch_size(int): patch size.
         mask_ratio(float): mask ratio of image.
     """
-    def __init__(self,
-                 size=224,
-                 patch_size=16,
-                 mask_ratio=0.75,
-                 mean=(0.485, 0.456, 0.406),
-                 std=(0.229, 0.224, 0.225),
-                 is_hwc=False,
-                 interpolation='cubic',
-                 **kwargs):
-        super().__init__(**kwargs)
-        self.size = size
-        self.patch_size = patch_size
-        self.mask_ratio = mask_ratio
-        self.mean = mean
-        self.std = std
-        self.is_hwc = is_hwc
-        self.interpolation = interpolation
-
+    def __init__(self, size=224, patch_size=16, mask_ratio=0.75):
+        super(ViTMAEImageProcessor, self).__init__(image_resolution=size)
+        self.resize = Resize((size, size), interpolation='cubic')
+        self.to_tensor = ToTensor()
+        self.normalize = Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225], is_hwc=False)
         if not 0 < mask_ratio < 1:
             raise ValueError('masking ratio must be kept between 0 and 1, but get mask_ratio {mask_ratio}.')
         # seq_length
@@ -79,10 +64,6 @@ class ViTMAEImageProcessor(BaseImageProcessor):
         Return:
             A 4-rank tensor for a batch of images.
         """
-        resize = Resize((self.size, self.size), interpolation=self.interpolation)
-        to_tensor = ToTensor()
-        normalize = Normalize(mean=self.mean, std=self.std, is_hwc=self.is_hwc)
-
         images = self._format_inputs(images)
 
         res = []
@@ -90,9 +71,9 @@ class ViTMAEImageProcessor(BaseImageProcessor):
         masks = []
         unmask_indexes = []
         for image in images:
-            image = resize(image)
-            image = to_tensor(image)
-            image = normalize(image)
+            image = self.resize(image)
+            image = self.to_tensor(image)
+            image = self.normalize(image)
             res.append(image)
             rand_indices = np.argsort(
                 np.random.uniform(size=(self.num_patches,)), axis=0).astype(np.int32)
@@ -152,7 +133,7 @@ class ViTMAEImageProcessor(BaseImageProcessor):
 
 
 @MindFormerRegister.register(MindFormerModuleType.PROCESSOR)
-class ViTMAEProcessor(ProcessorMixin):
+class ViTMAEProcessor(BaseProcessor):
     """
     ViTMAEProcessor,
     consists of a feature extractor (BaseFeatureEXtractor) for image input.
@@ -170,37 +151,8 @@ class ViTMAEProcessor(ProcessorMixin):
     """
     _support_list = MindFormerBook.get_processor_support_list()['mae']
 
-    attributes = ["image_processor"]
-    image_processor_class = "ViTMAEImageProcessor"
-
     def __init__(self, image_processor=None, return_tensors='ms'):
         super(ViTMAEProcessor, self).__init__(
             image_processor=image_processor,
             return_tensors=return_tensors
         )
-
-    def __call__(self, image_input=None, text_input=None):
-        """call function"""
-        output = {}
-
-        if image_input is not None and self.image_processor:
-            if not isinstance(self.image_processor, BaseImageProcessor):
-                raise TypeError(f"feature_extractor should inherit from the BaseImageProcessor,"
-                                f" but got {type(self.image_processor)}.")
-
-            image_output = self.image_processor(image_input)
-            output['image'] = image_output
-
-        if text_input is not None and self.tokenizer:
-            if not isinstance(self.tokenizer, PreTrainedTokenizerBase):
-                raise TypeError(f"tokenizer should inherited from the from PreTrainedTokenizerBase,"
-                                f" but got {type(self.tokenizer)}.")
-            # Format the input into a batch
-            if isinstance(text_input, str):
-                text_input = [text_input]
-            text_output = self.tokenizer(text_input, return_tensors=self.return_tensors,
-                                         max_length=self.max_length,
-                                         padding=self.padding)["input_ids"]
-            output['text'] = text_output
-
-        return output

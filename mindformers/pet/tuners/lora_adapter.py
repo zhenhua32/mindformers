@@ -17,16 +17,14 @@ Note: Low-Rank Adapter algrithm for mindformers' pretrained model.
 Reference: https://arxiv.org/abs/2106.09685
 """
 import re
-from typing import Union
 
-from mindspore._checkparam import args_type_check
 from mindspore import nn
 from mindpet.delta.lora import LoRADense
 
 from mindformers.modules.layers import Linear
 from mindformers.tools.logger import logger
 from .pet_adapter import PetAdapter
-from ..pet_config import LoraConfig
+from ..pet_config import PetConfig, LoraConfig
 from ..utils import re_match_list
 
 
@@ -90,10 +88,10 @@ class LoraAdapter(PetAdapter):
     LoraAdapter is the adapter to modify the pretrained model, which uses lora tuning algorithm.
 
     Args:
-        model (PreTrainedModel): The base pretrained model of mindformers.
+        model (BaseModel): The base pretrained model of mindformers.
         pet_config (PetConfig): The configurition of the Pet model.
     Return:
-        model (PreTrainedModel): The model replace the linear layer with lora dense layer.
+        model (BaseModel): The model replace the linear layer with lora dense layer.
     Examples:
         1.modify certain model of llama
         >>> from mindformers.pet.tuners.lora_adapter import LoraAdapter
@@ -104,12 +102,12 @@ class LoraAdapter(PetAdapter):
         >>> llama_pet_model = LoraAdapter.get_pet_model(llama_model, pet_config)
     """
     @classmethod
-    @args_type_check(config=(dict, LoraConfig))
-    def get_pet_model(cls, model: nn.Cell = None, config: Union[dict, LoraConfig] = None):
+    def get_pet_model(cls, model: nn.Cell = None, config: PetConfig = None):
         if not isinstance(config, LoraConfig):
             config = config.copy()
             config.pop("pet_type")
             config = LoraConfig(**config)
+        model = model if model else PetAdapter.get_pretrained_model(config)
         if config.target_modules is None:
             logger.warning("Lora Adapter use default replace rules: \'.*dense*|*linear*\'")
             config.target_modules = r'.*dense*|.*linear*'

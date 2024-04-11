@@ -19,7 +19,6 @@ Note:
 from __future__ import absolute_import
 
 import math
-from typing import Union
 import numpy as np
 
 from mindspore.common.tensor import Tensor
@@ -31,8 +30,6 @@ import mindspore.common.dtype as mstype
 from mindspore.ops import operations as P
 from mindspore.ops import functional as F
 from mindspore.nn.cell import Cell
-from mindspore._checkparam import args_type_check
-
 try:
     from mindspore._checkparam import Validator
 except ImportError:
@@ -40,26 +37,11 @@ except ImportError:
 from mindspore import log as logger
 from mindspore.parallel._utils import _get_parallel_mode
 from mindspore.context import ParallelMode
-
 try:
     from mindspore.nn.layer.flash_attention import FlashAttention
-
     FLASHATTENTION_VALID = True
 except ImportError:
     FLASHATTENTION_VALID = False
-try:
-    from mindspore.ops.operations.nn_ops import PromptFlashAttention
-
-    PROMPTFLASHATTENTION_VALID = True
-except ImportError:
-    PROMPTFLASHATTENTION_VALID = False
-
-try:
-    from mindspore.ops.operations.nn_ops import IncreFlashAttention
-
-    INCREFLASHATTENTION_VALID = True
-except ImportError:
-    INCREFLASHATTENTION_VALID = False
 
 from mindformers.modules.layers import LayerNorm, Linear, \
     _args_type_validator_check, _valid_type_checks, _valid_value_checks, \
@@ -67,8 +49,7 @@ from mindformers.modules.layers import LayerNorm, Linear, \
 from mindformers.modules.transformer.op_parallel_config import default_dpmp_config, _PipeLineConfig, OpParallelConfig, \
     _Config, _check_config, MoEParallelConfig
 from mindformers.modules.transformer.moe import default_moe_config, MoE, _check_moe_config
-from mindformers.version_control import get_dropout, choose_flash_attention_dtype, \
-    check_valid_flash_attention
+from mindformers.version_control import get_dropout, choose_flash_attention_dtype, check_valid_flash_attention
 
 from mindformers.tools.logger import _LogActionOnce
 from mindformers.tools.logger import logger as log
@@ -154,29 +135,6 @@ class EmbeddingOpParallelConfig(_Config):
     def dp_mp_config(self):
         return self._dp_mp_config
 
-    def __eq__(self, other) -> bool:
-        return isinstance(other, EmbeddingOpParallelConfig) and (self.to_dict() == other.to_dict())
-
-    def to_diff_dict(self):
-        config_dict = self.to_dict()
-        default_dict = EmbeddingOpParallelConfig().to_dict()
-        res_dict = {}
-        for k, v in config_dict.items():
-            if v != default_dict[k]:
-                res_dict[k] = v
-        return res_dict
-
-    def to_dict(self):
-        """to dict"""
-        config_dict = {
-            'data_parallel': self.data_parallel,
-            'model_parallel': self.model_parallel,
-            'select_recompute': self.select_recompute,
-            'use_seq_parallel': self.use_seq_parallel,
-            'vocab_emb_dp': self.vocab_emb_dp
-        }
-        return config_dict
-
 
 class TransformerRecomputeConfig(_Config):
     r"""
@@ -259,28 +217,6 @@ class TransformerRecomputeConfig(_Config):
         Validator.check_bool(value, "recompute_slice_activation")
         self._recompute_slice_activation = value
 
-    def __eq__(self, other) -> bool:
-        return isinstance(other, TransformerRecomputeConfig) and (self.to_dict() == other.to_dict())
-
-    def to_diff_dict(self):
-        config_dict = self.to_dict()
-        default_dict = TransformerRecomputeConfig().to_dict()
-        res_dict = {}
-        for k, v in config_dict.items():
-            if v != default_dict[k]:
-                res_dict[k] = v
-        return res_dict
-
-    def to_dict(self):
-        config_dict = {
-            "recompute": self._recompute,
-            "select_recompute": self._select_recompute,
-            "parallel_optimizer_comm_recompute": self._parallel_optimizer_comm_recompute,
-            "mp_comm_recompute": self._mp_comm_recompute,
-            "recompute_slice_activation": self._recompute_slice_activation,
-        }
-        return config_dict
-
 
 default_transformer_recompute_config = TransformerRecomputeConfig()
 
@@ -324,12 +260,9 @@ class TransformerOpParallelConfig(_Config):
             >>> config=TransformerOpParallelConfig(data_parallel=1, model_parallel=1, recompute=recompute_config)
     """
 
-    @args_type_check(recompute=(TransformerRecomputeConfig, dict))
     def __init__(self, data_parallel=1, model_parallel=1, expert_parallel=1, pipeline_stage=1, micro_batch_num=1,
-                 recompute: Union[TransformerRecomputeConfig, dict] = default_transformer_recompute_config,
-                 use_seq_parallel=False, optimizer_shard=None, gradient_aggregation_group=4, vocab_emb_dp=True):
-        if isinstance(recompute, dict):
-            recompute = TransformerRecomputeConfig(**recompute)
+                 recompute=default_transformer_recompute_config, use_seq_parallel=False,
+                 optimizer_shard=None, gradient_aggregation_group=4, vocab_emb_dp=True):
         self.recompute = recompute
         self.select_recompute = recompute.select_recompute
         self.use_seq_parallel = use_seq_parallel
@@ -344,36 +277,6 @@ class TransformerOpParallelConfig(_Config):
             data_parallel=data_parallel, model_parallel=model_parallel,
             select_recompute=recompute.select_recompute,
             expert_parallel=expert_parallel, use_seq_parallel=use_seq_parallel)
-
-    def __eq__(self, other) -> bool:
-        return isinstance(other, TransformerOpParallelConfig) and (self.to_dict() == other.to_dict())
-
-    def to_diff_dict(self):
-        config_dict = self.to_dict()
-        default_dict = TransformerOpParallelConfig().to_dict()
-        res_dict = {}
-        for k, v in config_dict.items():
-            if v != default_dict[k]:
-                res_dict[k] = v
-        if "recompute" in res_dict:
-            res_dict["recompute"] = self.recompute.to_diff_dict()
-        return res_dict
-
-    def to_dict(self):
-        """to dict"""
-        config_dict = {
-            'data_parallel': self.data_parallel,
-            'model_parallel': self.model_parallel,
-            'expert_parallel': self.expert_parallel,
-            'pipeline_stage': self.pipeline_stage,
-            'micro_batch_num': self.micro_batch_num,
-            'use_seq_parallel': self.use_seq_parallel,
-            'optimizer_shard': self.optimizer_shard,
-            'gradient_aggregation_group': self.gradient_aggregation_group,
-            'vocab_emb_dp': self.vocab_emb_dp,
-            'recompute': self.recompute.to_dict()
-        }
-        return config_dict
 
     @property
     def recompute(self):
@@ -452,8 +355,8 @@ class TransformerOpParallelConfig(_Config):
 
     @optimizer_shard.setter
     def optimizer_shard(self, value):
-        self._optimizer_shard = value
         if value:
+            self._optimizer_shard = value
             logger.warning("\"parallel_config.optimizer_shard\" is deprecated from MindFormers r0.7. It will not have "
                            "any effect. Please use \"parallel.enable_parallel_optimizer\" to turn on or off the "
                            "optimizer parallel.")
@@ -959,6 +862,7 @@ class LowerTriangularMaskWithDynamic(Cell):
         self.expand_dim_post.shard(((dp, 1, 1),))
 
 
+
 class VocabEmbedding(Cell):
     """
         The embedding lookup table from the 0-th dim of the parameter table. When the parallel_config.vocab_emb_dp is
@@ -1190,9 +1094,7 @@ class MultiHeadAttention(Cell):
                                 parallel_config=_valid_type_checks([OpParallelConfig],
                                                                    "MultiHeadAttention"),
                                 use_past=Validator.check_bool,
-                                use_flash_attention=Validator.check_bool,
-                                use_prompt_flash_attention=Validator.check_bool,
-                                use_incre_flash_attention=Validator.check_bool)
+                                use_flash_attention=Validator.check_bool)
     def __init__(self, batch_size,
                  src_seq_length,
                  tgt_seq_length,
@@ -1205,9 +1107,7 @@ class MultiHeadAttention(Cell):
                  param_init_type=mstype.float32,
                  use_past=False,
                  parallel_config=default_dpmp_config,
-                 use_flash_attention=False,
-                 use_prompt_flash_attention=False,
-                 use_incre_flash_attention=False):
+                 use_flash_attention=False):
         super(MultiHeadAttention, self).__init__()
         self._is_ascend = context.get_context('device_target') in ["Ascend"]
         self.dp = parallel_config.data_parallel
@@ -1359,8 +1259,6 @@ class MultiHeadAttention(Cell):
                  (parallel_config.data_parallel, parallel_config.model_parallel, 1, 1)))
             self.real_div = P.RealDiv().shard(
                 ((parallel_config.data_parallel, parallel_config.model_parallel, 1, 1), ()))
-            self.sub_sa = P.Sub().shard(
-                ((1,), (parallel_config.data_parallel, 1, 1, 1)))
             self.sub = P.Sub().shard(
                 ((1,), (parallel_config.data_parallel, 1, 1, 1)))
             self.mul = P.Mul().shard(
@@ -1461,31 +1359,6 @@ class MultiHeadAttention(Cell):
 
             self.one = Tensor([1.0], dtype=compute_dtype)
 
-        if self.use_prompt_flash_attention:
-            self.prompt_flash_attention = PromptFlashAttention(num_heads=num_heads,
-                                                               scale_value=1.0 / (math.sqrt(self.size_per_head)),
-                                                               pre_tokens=self.src_seq_length,
-                                                               next_tokens=0,
-                                                               input_layout='BNSD',
-                                                               num_key_value_heads=0)
-            self.prompt_flash_attention.shard(((parallel_config.data_parallel, parallel_config.model_parallel, 1, 1),
-                                               (parallel_config.data_parallel, parallel_config.model_parallel, 1, 1),
-                                               (parallel_config.data_parallel, parallel_config.model_parallel, 1, 1),
-                                               (parallel_config.data_parallel, 1, 1, 1)))
-            self.sub_pfa = P.Sub().shard(
-                ((1,), (parallel_config.data_parallel, 1, 1, 1)))
-            self.one = Tensor([1.0], dtype=compute_dtype)
-
-        if self.use_incre_flash_attention and self.use_past:
-            self.incre_flash_attention = IncreFlashAttention(num_heads=num_heads,
-                                                             scale_value=1.0 / (math.sqrt(self.size_per_head)),
-                                                             input_layout='BNSD',
-                                                             num_key_value_heads=0)
-            self.incre_flash_attention.shard(((parallel_config.data_parallel, parallel_config.model_parallel, 1, 1),
-                                              (parallel_config.data_parallel, parallel_config.model_parallel, 1, 1),
-                                              (parallel_config.data_parallel, parallel_config.model_parallel, 1, 1),
-                                              (parallel_config.data_parallel, 1, 1, 1)))
-
         if parallel_config.select_recompute:
             # _attn中涉及的关键算子使用重计算逻辑，通常配合序列并行使用，会有较好的性能提升效果
             self.batch_matmul.recompute()
@@ -1524,14 +1397,7 @@ class MultiHeadAttention(Cell):
                  self.n_head, self.size_per_head)),
             (0, 2, 1, 3))
         # FA: [bs, num_heads, seq_length, size_per_head] or [bs, num_heads, size_per_head, seq_length]
-        if not self.training:
-            do_different_shape = (self.use_flash_attention
-                                  or self.use_prompt_flash_attention
-                                  or self.use_incre_flash_attention)
-        else:
-            do_different_shape = self.use_flash_attention
-
-        key_transpose_shape = (0, 2, 1, 3) if do_different_shape else (0, 2, 3, 1)
+        key_transpose_shape = (0, 2, 1, 3) if self.use_flash_attention else (0, 2, 3, 1)
         key = self.transpose(
             F.reshape(
                 key, (batch_size, self._get_seq_length_under_incremental(self.tgt_seq_length),
@@ -1545,9 +1411,7 @@ class MultiHeadAttention(Cell):
                  self.n_head, self.size_per_head)),
             (0, 2, 1, 3))
         # support input shape is [bs, seq, seq] or [bs, heads, seq, seq]
-        # pfa use 4d, but fas use 3d
-        if attention_mask is not None and len(F.shape(attention_mask)) == 3 and \
-                ((not self.use_flash_attention) or ((not self.training) and self.use_prompt_flash_attention)):
+        if attention_mask is not None and len(F.shape(attention_mask)) == 3 and not self.use_flash_attention:
             # expand attention mask from [bs, seq, seq] -> [bs, 1, seq, seq]
             attention_mask = self.expand_dims(attention_mask, 1)
         # key and value for current token(s)
@@ -1559,8 +1423,7 @@ class MultiHeadAttention(Cell):
                 # Get the valid input length without padding
                 valid_length_vector = F.cast(self.less(self.range, batch_valid_length.view(-1, 1, 1)), self.dtype)
                 # Cover the key and value numbers corresponding to the padding position
-                expand_axis = 3 if do_different_shape else 2
-                key_present = self.mul1(key, self.expand_dims(valid_length_vector, expand_axis))
+                key_present = self.mul1(key, self.expand_dims(valid_length_vector, 2))
                 value_present = self.mul1(value, self.expand_dims(valid_length_vector, 3))
             # The second graph with the inpus size of (bs, 1)
             # the shape of query is (bs, num_heads, 1, size_per_head)
@@ -1572,14 +1435,8 @@ class MultiHeadAttention(Cell):
                 valid_length = self.reshape(valid_length, (-1, 1, 1))
                 valid_length_vector = F.cast(self.equal(valid_length, self.range), self.dtype)
                 # Pad the key and value to seq_length with only the position index not zero
-                if do_different_shape:
-                    multiples = (1, 1, self.seq_length, 1)
-                    expand_axis = 3
-                else:
-                    multiples = (1, 1, 1, self.seq_length)
-                    expand_axis = 2
-                current_key = self.mul1(self.tile(key, multiples),
-                                        self.expand_dims(valid_length_vector, expand_axis))
+                current_key = self.mul1(self.tile(key, (1, 1, 1, self.seq_length)),
+                                        self.expand_dims(valid_length_vector, 2))
                 current_value = self.mul1(self.tile(value, (1, 1, self.seq_length, 1)),
                                           self.expand_dims(valid_length_vector, 3))
                 # Concat the previous saved state and current state
@@ -1593,24 +1450,7 @@ class MultiHeadAttention(Cell):
         layer_present = (key_present, value_present)
         # multi head attention considering attention mask
         # the return shape is [bs * seq_length, hidden_size]
-        if not self.training and self.use_prompt_flash_attention:
-            if self.use_past and not self.is_first_iteration:
-                if self.use_incre_flash_attention:
-                    query, key, attention_mask = self._pfa_ifa_data_preprocess(query, key, attention_mask,
-                                                                               batch_valid_length)
-                    attention = self.incre_flash_attention(query, key, value, attention_mask,
-                                                           None, None, None, None, None, None, None, None)
-                    attention = self._merge_heads(attention)
-                else:
-                    key = self.transpose(key, (0, 1, 3, 2))
-                    attention = self._attn(query, key, value, attention_mask)
-            else:
-                query, key, attention_mask = self._pfa_ifa_data_preprocess(query, key, attention_mask,
-                                                                           batch_valid_length)
-                attention = self.prompt_flash_attention(query, key, value, attention_mask,
-                                                        None, None, None, None, None, None, None, None)[0]
-                attention = self._merge_heads(attention)
-        elif self.use_flash_attention:
+        if self.use_flash_attention:
             attention = self._flash_attn(query, key, value, attention_mask)
         else:
             attention = self._attn(query, key, value, attention_mask)
@@ -1635,23 +1475,6 @@ class MultiHeadAttention(Cell):
         if self.use_past and not self.is_first_iteration:
             return 1
         return length
-
-    def _pfa_ifa_data_preprocess(self, query, key, attention_mask, batch_valid_length):
-        r"""Return processed q, k and attention mask"""
-        if self.use_past and not self.is_first_iteration:
-            # Get the precise position index
-            current_index = batch_valid_length.squeeze(0)
-            index = self.sub1(F.cast(current_index, mstype.int32), 1)
-            index = F.reshape(index, (-1, 1, 1))
-            # Calculate the attention_mask matrix via the position index
-            attention_mask = F.cast(self.tensor_le(self.range, index), P.DType()(query))
-            attention_mask = self.expand_dims(attention_mask, 2)
-
-        attention_mask = self.sub_pfa(
-            P.Cast()(self.one, P.DType()(query)),
-            P.Cast()(attention_mask, P.DType()(query)))
-
-        return query, key, attention_mask
 
     def _check_inputs(self, query_tensor, key_tensor, value_tensor, attention_mask, key_past=None,
                       value_past=None, batch_valid_length=None):
@@ -1776,7 +1599,7 @@ class MultiHeadAttention(Cell):
                 attention_mask = F.cast(self.tensor_le(self.range, index), mstype.int32)
                 attention_mask = self.expand_dims(attention_mask, 2)
             # Minus 10000 for the position where masked to exclude them from softmax
-            multiplu_out = self.sub_sa(
+            multiplu_out = self.sub(
                 P.Cast()(F.tuple_to_array((1.0,)), P.DType()(attention_scores)),
                 P.Cast()(attention_mask, P.DType()(attention_scores)))
 
@@ -1927,9 +1750,7 @@ class TransformerEncoderLayer(Cell):
                                 parallel_config=_valid_type_checks([OpParallelConfig, MoEParallelConfig],
                                                                    "TransformerEncoderLayer"),
                                 use_past=Validator.check_bool,
-                                use_flash_attention=Validator.check_bool,
-                                use_prompt_flash_attention=Validator.check_bool,
-                                use_incre_flash_attention=Validator.check_bool)
+                                use_flash_attention=Validator.check_bool)
     def __init__(self,
                  batch_size,
                  hidden_size,
@@ -1946,9 +1767,7 @@ class TransformerEncoderLayer(Cell):
                  use_past=False,
                  moe_config=default_moe_config,
                  parallel_config=default_dpmp_config,
-                 use_flash_attention=False,
-                 use_prompt_flash_attention=False,
-                 use_incre_flash_attention=False):
+                 use_flash_attention=False):
         super(TransformerEncoderLayer, self).__init__()
         if batch_size or use_past:
             Validator.check_positive_int(batch_size)
@@ -1991,9 +1810,7 @@ class TransformerEncoderLayer(Cell):
                                                 param_init_type=param_init_type,
                                                 use_past=use_past,
                                                 parallel_config=attention_parallel_config,
-                                                use_flash_attention=use_flash_attention,
-                                                use_prompt_flash_attention=use_prompt_flash_attention,
-                                                use_incre_flash_attention=use_incre_flash_attention)
+                                                use_flash_attention=use_flash_attention)
             if self.use_moe:
                 self.output = MoE(hidden_size=hidden_size,
                                   dropout_rate=hidden_dropout_rate,
@@ -2049,21 +1866,6 @@ class TransformerEncoderLayer(Cell):
                     "by the 'parallel_config.model_parallel', but got the ffn_hidden_size is {} "
                     "and parallel_config. model_parallel is {}."
                     .format(ffn_hidden_size, parallel_config.model_parallel))
-            # flash attention / prompt flash attention / incre flash attention version validation
-            if use_flash_attention and not check_valid_flash_attention(FLASHATTENTION_VALID, "FlashAttention"):
-                use_flash_attention = False
-                log.info("Current MindSpore do not support flash attention, please upgrade to 2.2.0 or higher")
-            if use_prompt_flash_attention and \
-                    not check_valid_flash_attention(PROMPTFLASHATTENTION_VALID, "PromptFlashAttention"):
-                use_prompt_flash_attention = False
-                log.info("Current MindSpore or device do not support prompt flash attention, "
-                         "please upgrade to 2.2.0 or higher or use 910B to run pfa")
-            if use_incre_flash_attention and \
-                    not check_valid_flash_attention(INCREFLASHATTENTION_VALID, "IncreFlashAttention"):
-                use_incre_flash_attention = False
-                log.info("Current MindSpore or device do not support prompt flash attention, "
-                         "please upgrade to 2.2.0 or higher or use 910B to run ifa")
-
             _check_moe_config(moe_config, parallel_config)
             self.use_moe = (moe_config.expert_num > 1)
             self.use_past = use_past
@@ -2086,9 +1888,7 @@ class TransformerEncoderLayer(Cell):
                                                 param_init_type=param_init_type,
                                                 use_past=use_past,
                                                 parallel_config=attention_parallel_config,
-                                                use_flash_attention=use_flash_attention,
-                                                use_prompt_flash_attention=use_prompt_flash_attention,
-                                                use_incre_flash_attention=use_incre_flash_attention)
+                                                use_flash_attention=use_flash_attention)
             if self.use_moe:
                 self.output = MoE(hidden_size=hidden_size,
                                   dropout_rate=hidden_dropout_rate,
@@ -2118,10 +1918,7 @@ class TransformerEncoderLayer(Cell):
                 self.not_equal = P.NotEqual().shard(((1, 1, 1, 1), ()))
                 self.slice = P.StridedSlice().shard(((1, 1, 1, 1),))
                 size_per_head = hidden_size // num_heads
-                if use_prompt_flash_attention or use_flash_attention:
-                    self.key_shape = (batch_size, num_heads, seq_length, size_per_head)
-                else:
-                    self.key_shape = (batch_size, num_heads, size_per_head, seq_length)
+                self.key_shape = (batch_size, num_heads, size_per_head, seq_length)
                 self.value_shape = (batch_size, num_heads, seq_length, size_per_head)
                 # parameters saving key and value states
                 self.key_past = Parameter(Tensor(np.zeros(shape=self.key_shape), self.dtype), name="key_past")

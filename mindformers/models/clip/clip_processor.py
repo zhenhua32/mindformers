@@ -27,10 +27,9 @@ from mindformers.dataset import (
     BatchNormalize, BatchCenterCrop, BatchPILize
 )
 from mindformers.mindformer_book import MindFormerBook
-from mindformers.models.tokenization_utils_base import PreTrainedTokenizerBase
-from mindformers.models.image_processing_utils import BaseImageProcessor
-from mindformers.models.processing_utils import ProcessorMixin
-from mindformers.tools.register import MindFormerRegister, MindFormerModuleType
+from ..base_processor import BaseImageProcessor
+from ..base_processor import BaseProcessor
+from ...tools.register import MindFormerRegister, MindFormerModuleType
 
 
 @MindFormerRegister.register(MindFormerModuleType.PROCESSOR)
@@ -47,9 +46,15 @@ class CLIPImageProcessor(BaseImageProcessor):
         >>> type(processor)
         <class 'mindformers.models.clip.clip_processor.CLIPImageProcessor'>
     """
-    def __init__(self, image_resolution: Optional[int] = 224, **kwargs):
-        super().__init__(**kwargs)
-        self.image_resolution = image_resolution
+    def __init__(self, image_resolution: Optional[int] = 224):
+        super(CLIPImageProcessor, self).__init__(
+            image_resolution=image_resolution)
+        self.bchw2bhwc = BCHW2BHWC()
+        self.batch_pilizer = BatchPILize()
+        self.batch_resizer = BatchResize(image_resolution)
+        self.batch_crop = BatchCenterCrop(image_resolution)
+        self.batch_totensor = BatchToTensor()
+        self.batch_normalizer = BatchNormalize()
 
     def preprocess(self, images: Union[ms.Tensor, PIL.Image.Image,
                                        np.ndarray, List[PIL.Image.Image]], **kwargs):
@@ -62,20 +67,13 @@ class CLIPImageProcessor(BaseImageProcessor):
         Return:
             A 4-rank tensor for a batch of images.
         """
-        bchw2bhwc = BCHW2BHWC()
-        batch_pilizer = BatchPILize()
-        batch_resizer = BatchResize(self.image_resolution)
-        batch_crop = BatchCenterCrop(self.image_resolution)
-        batch_totensor = BatchToTensor()
-        batch_normalizer = BatchNormalize()
-
         if not self._bhwc_check(images):
-            images = bchw2bhwc(images)
-        images = batch_pilizer(images)
-        images = batch_resizer(images)
-        images = batch_crop(images)
-        images = batch_totensor(images)
-        images = batch_normalizer(images)
+            images = self.bchw2bhwc(images)
+        images = self.batch_pilizer(images)
+        images = self.batch_resizer(images)
+        images = self.batch_crop(images)
+        images = self.batch_totensor(images)
+        images = self.batch_normalizer(images)
 
         kwargs.pop("other", None)
         if isinstance(images, list):
@@ -99,14 +97,14 @@ class CLIPImageProcessor(BaseImageProcessor):
 
 
 @MindFormerRegister.register(MindFormerModuleType.PROCESSOR)
-class CLIPProcessor(ProcessorMixin):
+class CLIPProcessor(BaseProcessor):
     r"""CLIP Processor,
     consists of a feature extractor (BaseFeatureEXtractor) for image input,
-    and a tokenizer (PreTrainedTokenizerBase) for text input.
+    and a tokenizer (BaseTokenizer) for text input.
 
     Args:
         image_processor (BaseImageProcessor): Used for process image data.
-        tokenizer (PreTrainedTokenizerBase): Used for process text data.
+        tokenizer (BaseTokenizer): Used for process text data.
         max_length (Optional[int]): The length of text tokens.
         padding (Optional[str]): The padding strategy of tokenizer, [None, "max_length"].
         return_tensors (Optional[str]): The type of returned tensors for tokenizer, [None, "ms"].
@@ -119,10 +117,6 @@ class CLIPProcessor(ProcessorMixin):
     """
     _support_list = MindFormerBook.get_processor_support_list()['clip']
 
-    attributes = ["tokenizer", "image_processor"]
-    image_processor_class = "AutoImageProcessor"
-    tokenizer_class = "CLIPTokenizer"
-
     def __init__(self, image_processor, tokenizer,
                  max_length=77, padding='max_length', return_tensors='ms'):
         super(CLIPProcessor, self).__init__(
@@ -131,29 +125,3 @@ class CLIPProcessor(ProcessorMixin):
             max_length=max_length,
             padding=padding,
             return_tensors=return_tensors)
-
-    def __call__(self, image_input=None, text_input=None):
-        """call function"""
-        output = {}
-
-        if image_input is not None and self.image_processor:
-            if not isinstance(self.image_processor, BaseImageProcessor):
-                raise TypeError(f"feature_extractor should inherit from the BaseImageProcessor,"
-                                f" but got {type(self.image_processor)}.")
-
-            image_output = self.image_processor(image_input)
-            output['image'] = image_output
-
-        if text_input is not None and self.tokenizer:
-            if not isinstance(self.tokenizer, PreTrainedTokenizerBase):
-                raise TypeError(f"tokenizer should inherited from the from PreTrainedTokenizerBase,"
-                                f" but got {type(self.tokenizer)}.")
-            # Format the input into a batch
-            if isinstance(text_input, str):
-                text_input = [text_input]
-            text_output = self.tokenizer(text_input, return_tensors=self.return_tensors,
-                                         max_length=self.max_length,
-                                         padding=self.padding)["input_ids"]
-            output['text'] = text_output
-
-        return output

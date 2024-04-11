@@ -15,6 +15,7 @@
 """Build Model API."""
 from mindformers.tools.register import MindFormerRegister, MindFormerModuleType, MindFormerConfig
 from .build_config import build_model_config
+from .base_config import BaseConfig
 
 
 def build_model(
@@ -40,13 +41,8 @@ def build_model(
     """
     if config is None and class_name is None:
         return None
-
-    if class_name:
-        kwargs["config"] = config
-        return MindFormerRegister.get_instance(module_type, class_name, **kwargs)
-
     if config is not None:
-        if isinstance(config, dict) and not isinstance(config, MindFormerConfig):
+        if not isinstance(config, BaseConfig) and isinstance(config, dict) and not isinstance(config, MindFormerConfig):
             config = MindFormerConfig(**config)
         if default_args is None:
             default_args = {}
@@ -66,7 +62,8 @@ def build_model(
             return MindFormerRegister.get_instance_from_cfg(
                 config.arch, MindFormerModuleType.MODELS, default_args=default_args)
         return None
-    return None
+    return MindFormerRegister.get_instance(module_type, class_name, **kwargs)
+
 
 def build_encoder(
         config: dict = None, default_args: dict = None,

@@ -16,7 +16,7 @@
 
 from mindspore_lite import ModelType
 
-from mindformers.tools import DictConfig
+from mindformers.models import BaseConfig
 
 
 def convert_lite_model_type(model_type: str):
@@ -34,7 +34,7 @@ def convert_lite_model_type(model_type: str):
                    f"[mindir, mindir_lite], but get {model_type}")
 
 
-class InferConfig(DictConfig):
+class InferConfig(BaseConfig):
     """
     Inference config class.
     """

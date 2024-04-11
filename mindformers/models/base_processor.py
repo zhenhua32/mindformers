@@ -23,9 +23,45 @@ import yaml
 
 from ..mindformer_book import print_path_or_list, MindFormerBook
 from .build_processor import build_processor
-from .tokenization_utils_base import PreTrainedTokenizerBase
+from .base_tokenizer import BaseTokenizer
 from ..tools import logger
 from ..tools.register import MindFormerConfig
+
+
+class BaseImageProcessor:
+    """
+    BaseImageProcessor for all image preprocess.
+
+    Examples:
+        >>> from mindspore.dataset.vision.transforms import CenterCrop
+        >>> from mindformers.models.base_processor import BaseImageProcessor
+        >>> image_resolution = 224
+        >>> class MyImageProcessor(BaseImageProcessor):
+        ...     def __init__(self, image_resolution):
+        ...         super(MyImageProcessor, self).__init__(image_resolution=image_resolution)
+        ...         self.center_crop = CenterCrop(image_resolution)
+        ...
+        ...     def preprocess(self, images, **kwargs):
+        ...         res = []
+        ...         for image in images:
+        ...             image = self.center_crop(image)
+        ...             res.append(image)
+        ...         return res
+        ...
+        >>> my_image_processor = MyImageProcessor(image_resolution)
+        >>> output = my_image_processor(image)
+    """
+    def __init__(self, **kwargs):
+        self.config = {}
+        self.config.update(kwargs)
+
+    def __call__(self, image_data, **kwargs):
+        """forward process"""
+        return self.preprocess(image_data, **kwargs)
+
+    def preprocess(self, images, **kwargs):
+        """preprocess method"""
+        raise NotImplementedError("Each image processor must implement its own preprocess method")
 
 
 class BaseAudioProcessor:
@@ -112,8 +148,8 @@ class BaseProcessor:
             output['image'] = image_output
 
         if text_input is not None and self.tokenizer:
-            if not isinstance(self.tokenizer, PreTrainedTokenizerBase):
-                raise TypeError(f"tokenizer should inherited from the PreTrainedTokenizerBase,"
+            if not isinstance(self.tokenizer, BaseTokenizer):
+                raise TypeError(f"tokenizer should inherited from the BaseTokenizer,"
                                 f" but got {type(self.tokenizer)}.")
             # Format the input into a batch
             if isinstance(text_input, str):
@@ -172,7 +208,7 @@ class BaseProcessor:
         parsed_config = {"type": self.__class__.__name__}
 
         for key, val in config.items():
-            if isinstance(val, PreTrainedTokenizerBase):
+            if isinstance(val, BaseTokenizer):
                 parsed_sub_config = {"type": val.__class__.__name__}
                 parsed_sub_config.update(val.init_kwargs)
                 parsed_config.update({key: parsed_sub_config})

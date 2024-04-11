@@ -13,8 +13,8 @@
 # limitations under the License.
 # ============================================================================
 """LLaMA transformer Layer's APIs."""
-import math
 from typing import Tuple, Optional
+import math
 
 try:
     from mindspore._checkparam import Validator
@@ -27,23 +27,19 @@ from mindspore.common.tensor import Tensor
 from mindspore.context import ParallelMode
 from mindspore.ops import operations as P
 from mindspore.parallel._utils import _get_parallel_mode, _is_sharding_propagation
-
 try:
     from mindspore.nn.layer.flash_attention import FlashAttention
-
     FLASHATTENTION_VALID = True
 except ImportError:
     FLASHATTENTION_VALID = False
 
 from mindformers.models.llama.llama_layer import LlamaFeedForward, LlamaRMSNorm, LlamaRotaryEmbedding
-from mindformers.models.llama.llama_moe import LlamaMoE
 from mindformers.modules.layers import _check_input_dtype, Linear
 from mindformers.modules.transformer import TransformerOpParallelConfig
 from mindformers.modules import KVCacheMgr, PagedAttentionMgr
 
 from mindformers.tools.utils import is_version_ge
 from mindformers.tools.logger import logger
-
 
 class LLamaAttention(nn.Cell):
     r"""
@@ -106,7 +102,6 @@ class LLamaAttention(nn.Cell):
                 ((batch_size, num_heads, head_dim, tgt_seq_length),
                 (batch_size, num_heads, tgt_seq_length, head_dim)).
     """
-
     def __init__(self,
                  batch_size,
                  seq_length,
@@ -301,7 +296,7 @@ class LLamaAttention(nn.Cell):
                                    (bs_seq, self.hidden_size + self.kv_dim * 2), (1, 1))
         else:
             query = self.cast(self.wq(x), self.dtype)  # dp, 1 -> dp, mp
-            key = self.cast(self.wk(x), self.dtype)  # dp, 1 -> dp, mp
+            key = self.cast(self.wk(x), self.dtype)    # dp, 1 -> dp, mp
             value = self.cast(self.wv(x), self.dtype)  # dp, 1 -> dp, mp
 
         if self.use_past and not self.is_first_iteration:
@@ -317,7 +312,7 @@ class LLamaAttention(nn.Cell):
             key = self.transpose(key, (0, 2, 1, 3))
             value = self.transpose(value, (0, 2, 1, 3))
         # [bs, n_head/n_kv_head, seq/1, head_dim]
-        query, key = self.apply_rotary_emb(query, key, freqs_cis)  # dp, mp, 1, 1
+        query, key = self.apply_rotary_emb(query, key, freqs_cis) # dp, mp, 1, 1
         # kv cache: [bs, n_kv_head, 1, head_dim] -> [bs, n_kv_head, seq, head_dim]
         if self.use_past:
             if self.use_paged_attention:
@@ -344,7 +339,7 @@ class LLamaAttention(nn.Cell):
             else:
                 attention = self._attn(query, key, value, mask)
         # [bs, seq/1, hidden_dim] or [bs * seq/1, hidden_dim]
-        output = self.wo(attention)  # dp, mp -> dp, 1 / dp * mp, 1
+        output = self.wo(attention) # dp, mp -> dp, 1 / dp * mp, 1
         output = self.cast(output, ori_dtype)
 
         return output
@@ -369,7 +364,7 @@ class LLamaAttention(nn.Cell):
             x_merge: the 2d output
         """
         # [bs, n_head, seq/1, head_dim]
-        x = self.merger_head_transpose(x, (0, 2, 1, 3))  # dp,mp,1,1 -> dp,1,mp,1
+        x = self.merger_head_transpose(x, (0, 2, 1, 3)) # dp,mp,1,1 -> dp,1,mp,1
         # [bs, seq/1, n_head, head_dim]
         bs, seq_len, n_head, head_dim = self.shape(x)
         # [bs, seq/1, hidden_dim]
@@ -465,7 +460,6 @@ class LLamaDecodeLayer(nn.Cell):
               (batch_size, num_heads, seq_length, head_dim)).
 
     """
-
     def __init__(self,
                  batch_size,
                  seq_length,
@@ -489,7 +483,6 @@ class LLamaDecodeLayer(nn.Cell):
                  use_kvcache_op=False,
                  is_flexible_shape=False,
                  use_rope_slice=False,
-                 moe_config=None,
                  use_flash_attention=False,
                  use_prompt_flash_attention=False,
                  use_paged_attention=False,
@@ -540,22 +533,14 @@ class LLamaDecodeLayer(nn.Cell):
                                         block_size=block_size,
                                         num_blocks=num_blocks,
                                         parallel_config=parallel_config)
-        if moe_config is None or not moe_config.expert_num > 1:
-            self.feed_forward = LlamaFeedForward(dim=self.hidden_size,
-                                                 intermediate_size=intermediate_size,
-                                                 hidden_dim=4 * self.hidden_size,
-                                                 multiple_of=multiple_of,
-                                                 ffn_dim_multiplier=ffn_dim_multiplier,
-                                                 compute_dtype=compute_dtype,
-                                                 param_init_type=param_init_type,
-                                                 is_dynamic=is_dynamic)
-        else:
-            self.feed_forward = LlamaMoE(dim=self.hidden_size,
-                                         hidden_dim=intermediate_size,
-                                         compute_dtype=compute_dtype,
-                                         param_init_type=param_init_type,
-                                         moe_config=moe_config,
-                                         parallel_config=parallel_config)
+        self.feed_forward = LlamaFeedForward(dim=self.hidden_size,
+                                             intermediate_size=intermediate_size,
+                                             hidden_dim=4 * self.hidden_size,
+                                             multiple_of=multiple_of,
+                                             ffn_dim_multiplier=ffn_dim_multiplier,
+                                             compute_dtype=compute_dtype,
+                                             param_init_type=param_init_type,
+                                             is_dynamic=is_dynamic)
 
         dp = parallel_config.data_parallel
         mp = parallel_config.model_parallel
@@ -564,15 +549,13 @@ class LLamaDecodeLayer(nn.Cell):
             self.add.shard(((dp, 1, 1), (dp, 1, 1)))
             self.attention_norm.shard((dp, 1, 1))
             self.ffn_norm.shard((dp, 1, 1))
-            if moe_config is None or not moe_config.expert_num > 1:
-                self.feed_forward.mul.shard(((dp, 1, mp), (dp, 1, mp)))
+            self.feed_forward.mul.shard(((dp, 1, mp), (dp, 1, mp)))
 
         if parallel_config.use_seq_parallel and self.is_first_iteration:
             self.add.shard(((dp, mp, 1), (dp, mp, 1)))
             self.attention_norm.shard((dp, mp, 1))
             self.ffn_norm.shard((dp, mp, 1))
-            if moe_config is None or not moe_config.expert_num > 1:
-                self.feed_forward.w2.shard(((dp, mp), (1, mp)), out_strategy_matmul=((dp * mp, 1),))
+            self.feed_forward.w2.shard(((dp, mp), (1, mp)), out_strategy_matmul=((dp * mp, 1),))
 
     def construct(self, x, freqs_cis, mask=None, kvcache_inputs=None):
         """ Forward of transformer block. """

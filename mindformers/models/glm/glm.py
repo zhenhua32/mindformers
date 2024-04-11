@@ -30,11 +30,10 @@ from mindformers.tools.register import MindFormerRegister, MindFormerModuleType
 from mindformers.core.loss import CrossEntropyLoss
 from mindformers.modules.layers import LayerNorm
 from mindformers.version_control import get_dropout
-from mindformers.models.modeling_utils import PreTrainedModel
 
 from .glm_config import GLMConfig
 from .layers import DeepNormWithGLULayer
-
+from ..base_model import BaseModel
 
 #  Get MS backend: 0 vm 1 GE
 is_ge = os.getenv('MS_ENABLE_GE')
@@ -47,17 +46,6 @@ default_dpmp_config = OpParallelConfig()
 default_embedding_parallel_config = EmbeddingOpParallelConfig()
 
 __all__ = ['GLMForPreTraining', 'GLMChatModel']
-
-
-class GLMPreTrainedModel(PreTrainedModel):
-    """
-    An abstract class to handle weights initialization and a simple interface for downloading and loading pretrained
-    models.
-    """
-
-    config_class = GLMConfig
-    base_model_prefix = "glm"
-
 
 def set_parallel_configure_for_layer(network, layer_id, offset, parallel_config, layers):
     r"""
@@ -109,7 +97,7 @@ class ProcessLogits(nn.Cell):
         return outputs
 
 
-class GLMModel(GLMPreTrainedModel):
+class GLMModel(nn.Cell):
     """
     The backbone of GLM network
 
@@ -122,7 +110,7 @@ class GLMModel(GLMPreTrainedModel):
                  config,
                  op_parallel_config=default_dpmp_config,
                  embed_parallel_config=default_embedding_parallel_config):
-        super(GLMModel, self).__init__(config)
+        super(GLMModel, self).__init__()
         # recording parameters
         self.num_layers = config.num_layers
         self.hidden_size = config.hidden_size
@@ -253,7 +241,7 @@ class GLMHead(nn.Cell):
 
 
 @MindFormerRegister.register(MindFormerModuleType.MODELS)
-class GLMForPreTraining(GLMPreTrainedModel):
+class GLMForPreTraining(BaseModel):
     r"""
     Provide glm training loss or logits through network.
 

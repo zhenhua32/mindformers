@@ -38,7 +38,7 @@ except ImportError:
     FLASHATTENTION_VALID = False
 
 from mindformers.core.loss.loss import CrossEntropyLoss
-from mindformers.models.modeling_utils import PreTrainedModel
+from mindformers.models.base_model import BaseModel
 from mindformers.models.utils import cell_reuse
 from mindformers.tools.logger import _LogActionOnce
 from mindformers.tools.register.register import MindFormerModuleType, MindFormerRegister
@@ -52,7 +52,7 @@ from mindformers.version_control import check_valid_paged_attention
 
 
 @MindFormerRegister.register(MindFormerModuleType.MODELS)
-class QwenForCausalLM(QwenPreTrainedModel):
+class QwenForCausalLM(BaseModel):
     r"""
         Provide qwen training loss or logits through network.
         Args:
@@ -201,7 +201,7 @@ class QwenForCausalLM(QwenPreTrainedModel):
             self.lm_head.shard(strategy_matmul=((1, 1), (dp * mp, 1)))
 
 
-class QwenModel(QwenPreTrainedModel):
+class QwenModel(BaseModel):
     """transformer"""
 
     def __init__(self, config):

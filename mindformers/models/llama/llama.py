@@ -15,7 +15,6 @@
 """LLaMA models' APIs."""
 import copy
 import numpy as np
-
 import mindspore as ms
 import mindspore.common.dtype as mstype
 
@@ -27,18 +26,16 @@ from mindspore import Tensor, nn
 from mindspore.context import ParallelMode
 from mindspore.ops import operations as P
 from mindspore.parallel._utils import _get_parallel_mode, _is_sharding_propagation
-
 try:
     # pylint: disable=W0611
     from mindspore.nn.layer.flash_attention import FlashAttention
-
     FLASHATTENTION_VALID = True
 except ImportError:
     FLASHATTENTION_VALID = False
 
 from mindformers.core.loss.loss import CrossEntropyLoss
 from mindformers.mindformer_book import MindFormerBook
-from mindformers.models.modeling_utils import PreTrainedModel
+from mindformers.models.base_model import BaseModel
 from mindformers.modules.layers import Linear
 from mindformers.modules.transformer.op_parallel_config import _check_config
 from mindformers.modules.transformer.transformer import LowerTriangularMaskWithDynamic
@@ -54,17 +51,6 @@ from ..utils import cell_reuse
 from ...tools.logger import logger
 
 __all__ = ['LlamaModel', 'LlamaForCausalLM']
-
-
-class LlamaPreTrainedModel(PreTrainedModel):
-    """
-    An abstract class to handle weights initialization and a simple interface for downloading and loading pretrained
-    models.
-    """
-
-    config_class = LlamaConfig
-    base_model_prefix = "llama"
-
 
 def layer_compute_dtype(layer, layer_id, offset, parallel_config, n_layers, select_recompute=False):
     r"""
@@ -107,7 +93,7 @@ def layer_compute_dtype(layer, layer_id, offset, parallel_config, n_layers, sele
                 recompute_slice_activation=parallel_config.recompute.recompute_slice_activation)
 
 
-class LlamaModel(LlamaPreTrainedModel):
+class LlamaModel(BaseModel):
     r"""
     Transformer decoder consisting of *config.num_hidden_layers* layers. Each layer is a [`LlamaDecoderLayer`]
     Args:
@@ -225,7 +211,6 @@ class LlamaModel(LlamaPreTrainedModel):
                                          use_kvcache_op=config.use_kvcache_op,
                                          is_flexible_shape=config.is_flexible_shape,
                                          use_rope_slice=config.use_rope_slice,
-                                         moe_config=config.moe_config,
                                          parallel_config=config.parallel_config)
             layer_compute_dtype(layer, layer_id, config.offset, config.parallel_config,
                                 config.num_layers, select_recompute=config.parallel_config.recompute.select_recompute)
@@ -278,13 +263,13 @@ class LlamaModel(LlamaPreTrainedModel):
         bs, seq_len = self.shape(tokens)
         if not self.use_past:
             freqs_cis = self.freqs_mgr()
-            mask = self.casual_mask(tokens)  # mask: [bs, seq, seq]
+            mask = self.casual_mask(tokens) # mask: [bs, seq, seq]
             mask = self.casual_mask.post_process(mask)
             kvcache_inputs = None
         else:
             if self.is_first_iteration:
                 freqs_cis = self.freqs_mgr(seq_len)
-                mask = self.casual_mask(tokens)  # mask: [bs, seq, seq]
+                mask = self.casual_mask(tokens) # mask: [bs, seq, seq]
             else:
                 freqs_cis = self.freqs_mgr.increment(batch_valid_length, bs)
                 if self.is_dynamic and self.is_flexible_shape and not self.use_kvcache_op:
@@ -310,7 +295,7 @@ class LlamaModel(LlamaPreTrainedModel):
 
 
 @MindFormerRegister.register(MindFormerModuleType.MODELS)
-class LlamaForCausalLM(LlamaPreTrainedModel):
+class LlamaForCausalLM(BaseModel):
     r"""
         Provide llama training loss or logits through network.
 
@@ -363,7 +348,7 @@ class LlamaForCausalLM(LlamaPreTrainedModel):
                               compute_dtype=config.compute_dtype,
                               param_init_type=config.param_init_type,
                               skip_redistribution=config.is_dynamic,
-                              weight_init="normal")  # meta default: xavier_normal
+                              weight_init="normal") # meta default: xavier_normal
 
         mp = config.parallel_config.model_parallel
         vocab_size = config.vocab_size

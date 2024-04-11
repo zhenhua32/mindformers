@@ -14,7 +14,6 @@
 # ============================================================================
 
 """models init"""
-from .auto import *
 from .bert import *
 from .mae import *
 from .vit import *
@@ -30,25 +29,18 @@ from .llama import *
 from .pangualpha import *
 from .bloom import *
 from .sam import *
-from .tokenization_utils import *
-from .tokenization_utils_fast import PreTrainedTokenizerFast
-from .modeling_utils import *
-from .configuration_utils import *
+from .base_tokenizer import *
 from .base_config import BaseConfig
 from .base_model import BaseModel
-from .image_processing_utils import BaseImageProcessor
-from .processing_utils import ProcessorMixin
-from .base_processor import BaseProcessor, BaseAudioProcessor
+from .base_processor import BaseProcessor, BaseImageProcessor, BaseAudioProcessor
 from .build_tokenizer import build_tokenizer
 from .build_processor import build_processor
 from .build_model import build_model_config, build_head, \
     build_model, build_encoder
-from .utils import CONFIG_NAME, FEATURE_EXTRACTOR_NAME, IMAGE_PROCESSOR_NAME
 
 __all__ = ['BaseConfig', 'BaseModel', 'BaseProcessor', 'BaseImageProcessor',
-           'BaseAudioProcessor', 'PreTrainedTokenizerFast']
+           'BaseAudioProcessor']
 
-__all__.extend(auto.__all__)
 __all__.extend(blip2.__all__)
 __all__.extend(bert.__all__)
 __all__.extend(mae.__all__)
@@ -63,7 +55,4 @@ __all__.extend(glm3.__all__)
 __all__.extend(llama.__all__)
 __all__.extend(pangualpha.__all__)
 __all__.extend(bloom.__all__)
-__all__.extend(sam.__all__)
-__all__.extend(tokenization_utils.__all__)
-__all__.extend(modeling_utils.__all__)
-__all__.extend(configuration_utils.__all__)
+__all__.extend(base_tokenizer.__all__)

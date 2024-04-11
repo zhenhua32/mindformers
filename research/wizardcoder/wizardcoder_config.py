@@ -20,18 +20,16 @@ from mindformers.modules.transformer.transformer import default_transformer_conf
 
 from mindformers.tools.register import MindFormerRegister, MindFormerModuleType
 from mindformers.models.utils import convert_mstype
-from mindformers.models.configuration_utils import PretrainedConfig
+from mindformers.models.base_config import BaseConfig
 
 __all__ = ['WizardCoderConfig']
 
 
 @MindFormerRegister.register(MindFormerModuleType.CONFIG)
-class WizardCoderConfig(PretrainedConfig):
+class WizardCoderConfig(BaseConfig):
     """
     wizardcoder config class which defines the model size
     """
-
-    model_type = "wizardcoder"
 
     def __init__(self,
                  dropout_prob: float = 0.1,

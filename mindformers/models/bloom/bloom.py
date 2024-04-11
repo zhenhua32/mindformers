@@ -25,23 +25,13 @@ from mindspore.ops import operations as P
 from mindformers.modules.transformer import VocabEmbedding
 from mindformers.modules.layers import LayerNorm, AlibiTensor
 from mindformers.core.loss import CrossEntropyLoss
-from mindformers.models.modeling_utils import PreTrainedModel
+from mindformers.models.base_model import BaseModel
 from mindformers.tools.logger import logger
 from mindformers.tools.register import MindFormerRegister, MindFormerModuleType
 from mindformers.mindformer_book import MindFormerBook
 from .layers import BloomBlocks, CausalMask
 from .bloom_config import BloomConfig
 from ..utils import convert_mstype, cell_reuse
-
-
-class BloomPreTrainedModel(PreTrainedModel):
-    """
-    An abstract class to handle weights initialization and a simple interface for downloading and loading pretrained
-    models.
-    """
-
-    config_class = BloomConfig
-    base_model_prefix = "bloom"
 
 
 def jit_inference_with_condition():
@@ -116,7 +106,7 @@ def set_parallel_configure_for_layer(network, layer_id, offset, parallel_config,
             network.recompute(recompute_slice_activation=parallel_config.recompute.recompute_slice_activation)
 
 
-class BloomModel(BloomPreTrainedModel):
+class BloomModel(nn.Cell):
     """
     The backbone of Bloom network
 
@@ -133,7 +123,7 @@ class BloomModel(BloomPreTrainedModel):
     """
 
     def __init__(self, config):
-        super(BloomModel, self).__init__(config)
+        super(BloomModel, self).__init__()
 
         self.embedding = BloomEmbeddingLayer(config)
         self.embedding.pipeline_stage = 0
@@ -232,7 +222,7 @@ class BloomHead(nn.Cell):
 
 
 @MindFormerRegister.register(MindFormerModuleType.MODELS)
-class BloomLMHeadModel(BloomPreTrainedModel):
+class BloomLMHeadModel(BaseModel):
     """
     Provide bloom training loss or logits through network.
 

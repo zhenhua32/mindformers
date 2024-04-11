@@ -23,19 +23,17 @@ import mindspore.common.dtype as mstype
 from mindspore.ops import operations as P
 
 from mindformers.tools.register import MindFormerRegister, MindFormerModuleType
-from mindformers.models.modeling_utils import PreTrainedModel
+from mindformers.models.base_model import BaseModel
 from mindformers.modules.layers import Linear, LayerNorm
 
 from .sam_layers import MLPBlock, LayerNorm2d
-from .sam_config import MaskDecoderConfig
+
 
 @MindFormerRegister.register(MindFormerModuleType.MODELS)
-class SamMaskDecoder(PreTrainedModel):
+class SAMMaskDecoder(BaseModel):
     """
     A class to predict masks given image and prompt embeddings using a transformer architecture.
     """
-    config_class = MaskDecoderConfig
-    base_model_prefix = "sam_mask_decoder"
 
     def __init__(self, config) -> None:
         super().__init__(config)

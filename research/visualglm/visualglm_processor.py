@@ -28,9 +28,7 @@ from mindformers.dataset.transforms.vision_transforms import (
     BatchToTensor,
     BatchNormalize
 )
-from mindformers.models.tokenization_utils_base import PreTrainedTokenizerBase
-from mindformers.models.image_processing_utils import BaseImageProcessor
-from mindformers.models.processing_utils import ProcessorMixin
+from mindformers.models.base_processor import BaseProcessor, BaseImageProcessor
 from mindformers.tools.register import MindFormerRegister, MindFormerModuleType
 
 
@@ -62,18 +60,20 @@ class VisualGLMImageProcessor(BaseImageProcessor):
     def __init__(self,
                  image_size: Optional[int] = 224,
                  interpolation: Optional[str] = 'bicubic',
-                 mean=(0.48145466, 0.4578275, 0.40821073),
-                 std=(0.26862954, 0.26130258, 0.27577711),
-                 is_hwc=False,
-                 **kwargs):
-        super().__init__(**kwargs)
-        self.image_size = image_size
+                 mean=None,
+                 std=None,
+                 is_hwc=False):
+        self.pilize = BatchPILize()
+        super(VisualGLMImageProcessor, self).__init__()
         if isinstance(image_size, int):
-            self.image_size = (image_size,) * 2
-        self.interpolation = interpolation
-        self.mean = mean
-        self.std = std
-        self.is_hwc = is_hwc
+            image_size = (image_size,) * 2
+        self.resize = BatchResize(image_size, interpolation=interpolation)
+        self.to_tensor = BatchToTensor()
+        if mean is None:
+            mean = (0.48145466, 0.4578275, 0.40821073)
+        if std is None:
+            std = (0.26862954, 0.26130258, 0.27577711)
+        self.normalize = BatchNormalize(mean, std, is_hwc)
 
     def preprocess(self, images: Union[ms.Tensor, PIL.Image.Image,
                                        np.ndarray, List[PIL.Image.Image]], **kwargs):
@@ -86,15 +86,10 @@ class VisualGLMImageProcessor(BaseImageProcessor):
         Return:
             A 4-rank tensor for a batch of images.
         """
-        pilize = BatchPILize()
-        resize = BatchResize(self.image_size, interpolation=self.interpolation)
-        to_tensor = BatchToTensor()
-        normalize = BatchNormalize(self.mean, self.std, self.is_hwc)
-
-        images = pilize(images)
-        images = resize(images)
-        images = to_tensor(images)
-        images = normalize(images)
+        images = self.pilize(images)
+        images = self.resize(images)
+        images = self.to_tensor(images)
+        images = self.normalize(images)
 
         kwargs.pop("other", None)
         if isinstance(images, list):
@@ -118,14 +113,14 @@ class VisualGLMImageProcessor(BaseImageProcessor):
 
 
 @MindFormerRegister.register(MindFormerModuleType.PROCESSOR)
-class VisualGLMProcessor(ProcessorMixin):
+class VisualGLMProcessor(BaseProcessor):
     r"""Blip2 Processor,
     consists of a feature extractor (BaseFeatureEXtractor) for image input,
-    and a tokenizer (PreTrainedTokenizerBase) for text input.
+    and a tokenizer (BaseTokenizer) for text input.
 
     Args:
         image_processor (BaseImageProcessor): Used for process image data.
-        tokenizer (PreTrainedTokenizerBase): Used for process text data.
+        tokenizer (BaseTokenizer): Used for process text data.
         max_length (Optional[int]): The length of text tokens.
         padding (Optional[str]): The padding strategy of tokenizer, [None, "max_length"].
         return_tensors (Optional[str]): The type of returned tensors for tokenizer, [None, "ms"].
@@ -157,10 +152,6 @@ class VisualGLMProcessor(ProcessorMixin):
        [ 101, 1037, 2611 ...    0,    0,    0]])}
     """
 
-    attributes = ["tokenizer", "image_processor"]
-    image_processor_class = "VisualGLMImageProcessor"
-    tokenizer_class = "AutoTokenizer"
-
     def __init__(self, image_processor, tokenizer,
                  max_length=32, padding='max_length', return_tensors='ms'):
         super(VisualGLMProcessor, self).__init__(
@@ -169,31 +160,3 @@ class VisualGLMProcessor(ProcessorMixin):
             max_length=max_length,
             padding=padding,
             return_tensors=return_tensors)
-
-    def __call__(self, text_input=None, text_pair=None):
-        """call function"""
-        output = {}
-        if not self.tokenizer:
-            raise ValueError(f"For {self.__name__}, the `tokenizer` should not be None.")
-        if not isinstance(self.tokenizer, PreTrainedTokenizerBase):
-            raise TypeError(f"tokenizer should inherited from the PreTrainedTokenizerBase,"
-                            f" but got {type(self.tokenizer)}.")
-        if text_input:
-            # Format the input into a batch
-            if isinstance(text_input, str):
-                text_input = [text_input]
-            text_output = self.tokenizer(text_input, return_tensors=self.return_tensors,
-                                         max_length=self.max_length,
-                                         padding=self.padding)["input_ids"]
-            output['text'] = text_output
-
-        if text_pair:
-            # Format the input into a batch
-            if isinstance(text_pair, str):
-                text_input = [text_pair]
-            text_output = self.tokenizer(text_pair, return_tensors=self.return_tensors,
-                                         max_length=self.tgt_max_length,
-                                         padding=self.padding)["input_ids"]
-            output['tgt_output'] = text_output
-
-        return output

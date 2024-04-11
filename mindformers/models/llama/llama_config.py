@@ -14,24 +14,20 @@
 # ============================================================================
 """Llama Config API."""
 
-from typing import Optional, Union
 
-from mindspore._checkparam import args_type_check
-
-from mindformers.modules.transformer.moe import MoEConfig
-from mindformers.modules.transformer.transformer import default_transformer_config, \
-    TransformerOpParallelConfig, default_moe_config
+from typing import Optional
+from mindformers.modules.transformer.transformer import default_transformer_config, TransformerOpParallelConfig
 from mindformers.tools.register import MindFormerRegister, MindFormerModuleType
-from mindformers.models.configuration_utils import PretrainedConfig
-from mindformers.models.utils import convert_mstype
-from mindformers.mindformer_book import MindFormerBook
-from mindformers.tools.logger import logger
+from ..utils import convert_mstype
+from ..base_config import BaseConfig
+from ...mindformer_book import MindFormerBook
+from ...tools.logger import logger
 
 __all__ = ['LlamaConfig']
 
 
 @MindFormerRegister.register(MindFormerModuleType.CONFIG)
-class LlamaConfig(PretrainedConfig):
+class LlamaConfig(BaseConfig):
     """
     LLaMA config class which defines the model size.
 
@@ -102,10 +98,8 @@ class LlamaConfig(PretrainedConfig):
             Class, LlamaConfig.
     """
 
-    model_type = "llama"
     _support_list = MindFormerBook.get_config_support_list()['llama']
 
-    @args_type_check(parallel_config=(dict, TransformerOpParallelConfig))
     def __init__(self,
                  batch_size: int = 1,
                  seq_length: int = 2048,
@@ -115,8 +109,8 @@ class LlamaConfig(PretrainedConfig):
                  n_kv_heads: Optional[int] = None,
                  max_position_embedding: Optional[int] = None,
                  intermediate_size: Optional[int] = None,
-                 vocab_size: int = 32000,  # defined later by tokenizer
-                 multiple_of: int = 256,  # make SwiGLU hidden layer size multiple of large power of 2
+                 vocab_size: int = 32000,   # defined later by tokenizer
+                 multiple_of: int = 256,    # make SwiGLU hidden layer size multiple of large power of 2
                  ffn_dim_multiplier: Optional[int] = None,
                  rms_norm_eps: float = 1e-5,
                  bos_token_id: int = 1,
@@ -131,8 +125,7 @@ class LlamaConfig(PretrainedConfig):
                  param_init_type: str = "float16",
                  qkv_has_bias: bool = False,
                  qkv_concat: bool = False,
-                 parallel_config: Union[dict, TransformerOpParallelConfig] = default_transformer_config,
-                 moe_config: Union[dict, MoEConfig] = default_moe_config,
+                 parallel_config: TransformerOpParallelConfig = default_transformer_config,
                  use_past: bool = False,
                  pretrain_seqlen=None,
                  compute_in_2d=None,
@@ -158,10 +151,6 @@ class LlamaConfig(PretrainedConfig):
                  do_sample: bool = True,
                  **kwargs):
         super(LlamaConfig, self).__init__(**kwargs)
-        if isinstance(parallel_config, dict):
-            parallel_config = TransformerOpParallelConfig(**parallel_config)
-        if isinstance(moe_config, dict):
-            moe_config = MoEConfig(**moe_config)
         self.batch_size = batch_size
         self.seq_length = seq_length
         self.vocab_size = vocab_size
@@ -182,7 +171,6 @@ class LlamaConfig(PretrainedConfig):
         self.rotary_dtype = convert_mstype(rotary_dtype)
         self.compute_dtype = convert_mstype(compute_dtype)
         self.parallel_config = parallel_config
-        self.moe_config = moe_config
         self.checkpoint_name_or_path = checkpoint_name_or_path
         self.bos_token_id = bos_token_id
         self.eos_token_id = eos_token_id

@@ -24,7 +24,7 @@ from mindspore.nn import Cell
 from mindspore.dataset import GeneratorDataset
 
 from mindformers.dataset import BaseDataset
-from mindformers.models import PreTrainedModel, PreTrainedTokenizerBase, BaseImageProcessor
+from mindformers.models import BaseModel, BaseTokenizer, BaseImageProcessor
 from mindformers.tools.logger import logger
 from mindformers.tools.register import MindFormerRegister, \
     MindFormerModuleType, MindFormerConfig
@@ -59,7 +59,7 @@ class ZeroShotImageClassificationTrainer(BaseTrainer):
 
     def evaluate(self,
                  config: Optional[Union[dict, MindFormerConfig, ConfigArguments, TrainingArguments]] = None,
-                 network: Optional[Union[Cell, PreTrainedModel]] = None,
+                 network: Optional[Union[Cell, BaseModel]] = None,
                  dataset: Optional[Union[BaseDataset, GeneratorDataset]] = None,
                  callbacks: Optional[Union[Callback, List[Callback]]] = None,
                  compute_metrics: Optional[Union[dict, set]] = None,
@@ -74,8 +74,8 @@ class ZeroShotImageClassificationTrainer(BaseTrainer):
                 The task config which is used to configure the dataset, the hyper-parameter, optimizer, etc.
                 It supports config dict or MindFormerConfig or TrainingArguments or ConfigArguments class.
                 Default: None.
-            network (Optional[Union[Cell, PreTrainedModel]]): The network for trainer.
-                It supports model name or PreTrainedModel or MindSpore Cell class.
+            network (Optional[Union[Cell, BaseModel]]): The network for trainer.
+                It supports model name or BaseModel or MindSpore Cell class.
                 Default: None.
             dataset (Optional[Union[BaseDataset, GeneratorDataset]]): The evaluate dataset.
                 It supports real dataset path or BaseDateset class or MindSpore Dataset class.
@@ -105,8 +105,8 @@ class ZeroShotImageClassificationTrainer(BaseTrainer):
                 config: Optional[Union[dict, MindFormerConfig, ConfigArguments, TrainingArguments]] = None,
                 input_data: Optional[Union[GeneratorDataset,
                                            Tensor, np.ndarray, Image, str, list]] = None,
-                network: Optional[Union[Cell, PreTrainedModel]] = None,
-                tokenizer: Optional[PreTrainedTokenizerBase] = None,
+                network: Optional[Union[Cell, BaseModel]] = None,
+                tokenizer: Optional[BaseTokenizer] = None,
                 image_processor: Optional[BaseImageProcessor] = None, **kwargs):
         """
         The prediction API of zero-shot image classification task. It allows to quickly start prediction based on
@@ -118,14 +118,14 @@ class ZeroShotImageClassificationTrainer(BaseTrainer):
                 The task config which is used to configure the dataset, the hyper-parameter, optimizer, etc.
                 It supports config dict or MindFormerConfig or TrainingArguments or ConfigArguments class.
                 Default: None.
-            network (Optional[Union[Cell, PreTrainedModel]]): The network for trainer.
-                It supports model name or PreTrainedModel or MindSpore Cell class.
+            network (Optional[Union[Cell, BaseModel]]): The network for trainer.
+                It supports model name or BaseModel or MindSpore Cell class.
                 Default: None.
             input_data (Optional[Union[GeneratorDataset, Tensor, np.ndarray, Image, str, list]]):
                 The dataset. It supports real dataset path or
                 BaseDateset class or MindSpore Dataset class.
                 Default: None.
-            tokenizer (Optional[PreTrainedTokenizerBase]): Used for text process.
+            tokenizer (Optional[BaseTokenizer]): Used for text process.
             image_processor (Optional[BaseImageProcessor]): Used for image process.
 
         Returns:

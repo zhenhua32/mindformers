@@ -21,7 +21,7 @@ from mindspore_lite import Model, ModelGroup, ModelGroupFlag
 
 from mindformers.inference.context import build_context
 from mindformers.inference.infer_config import InferConfig
-from mindformers.models import PreTrainedTokenizerBase, BaseImageProcessor
+from mindformers.models import BaseTokenizer, BaseImageProcessor
 from mindformers.tools.logger import logger
 
 
@@ -56,8 +56,8 @@ class DynShapeGear:
             val_seq = list(filter(lambda k: k >= input_seq_length, self.config_gears[key_bs]))
             if val_seq:
                 return key_bs, val_seq[0]
-        err_msg = (f"Match gear failed, input seq length({input_seq_length}) out of range, " \
-                   f"please check seq length or lite config.")
+        err_msg = (f"Match gear failed, input seq length({input_batch_size}) out of range, " \
+                   f"please check seq length or lite_inc.ini.")
         logger.error(err_msg)
         raise RuntimeError(err_msg)
 
@@ -133,7 +133,7 @@ class BaseInfer(metaclass=abc.ABCMeta):
     """BaseInfer."""
     def __init__(self,
                  config: InferConfig = None,
-                 tokenizer: Optional[PreTrainedTokenizerBase] = None,
+                 tokenizer: Optional[BaseTokenizer] = None,
                  image_processor: Optional[BaseImageProcessor] = None):
         if config is None:
             config = InferConfig()

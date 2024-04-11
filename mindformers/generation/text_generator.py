@@ -31,29 +31,12 @@ from mindformers.generation.generation_config import GenerationConfig
 from mindformers.generation.logits_process import (LogitNormalization, LogitsProcessorList,
                                                    RepetitionPenaltyLogitsProcessor,
                                                    TemperatureLogitsWarper, TopKLogitsWarper,
-                                                   TopPLogitsWarper, MinLengthLogitsProcessor,
-                                                   MinNewTokensLengthLogitsProcessor)
+                                                   TopPLogitsWarper)
 from mindformers.generation.streamers import BaseStreamer
 from mindformers.generation.utils import softmax_with_threads, topk
 from mindformers.tools import logger
 
-__all__ = ["GenerationMixin"]
-
-
-def get_valid_length_each_example(input_ids, pad_token_id):
-    """get valid length and max length in a batch"""
-    batch_size = input_ids.shape[0]
-    valid_length_each_example = []
-    for i in range(batch_size):
-        # As the nonzero returns the index and we need length
-        valid_length_each_example.append(
-            np.max(np.argwhere(input_ids[i] != pad_token_id))
-            + 1
-        )
-    valid_length_each_example = np.array(valid_length_each_example)
-    logger.debug("Get the valid for each example is: %s", valid_length_each_example)
-    max_length = np.max(valid_length_each_example)
-    return valid_length_each_example, max_length
+__all__ = ["GeneratorMixin"]
 
 
 class GenerationMode:
@@ -68,7 +51,7 @@ class GenerationMode:
     BEAM_SEARCH = "beam_search"
 
 
-class GenerationMixin:
+class GeneratorMixin:
     """Generator For the nlp models"""
 
     def __init__(self):
@@ -125,7 +108,6 @@ class GenerationMixin:
 
     def _get_logits_processor(self,
                               generation_config: GenerationConfig,
-                              input_ids_seq_length: int,
                               logits_processor: Optional[LogitsProcessorList]):
         """
         This class returns a [`LogitsProcessorList`] list object that contains all relevant [`LogitsProcessor`]
@@ -136,31 +118,6 @@ class GenerationMixin:
 
         if generation_config.repetition_penalty is not None and generation_config.repetition_penalty != 1.0:
             processors.append(RepetitionPenaltyLogitsProcessor(repetition_penalty=generation_config.repetition_penalty))
-        if (
-                generation_config.min_length is not None
-                and generation_config.eos_token_id is not None
-                and generation_config.min_length > 0
-        ):
-            processors.append(
-                MinLengthLogitsProcessor(
-                    generation_config.min_length,
-                    generation_config.eos_token_id,
-                    generation_config.pad_token_id
-                )
-            )
-        if (
-                generation_config.min_new_tokens is not None
-                and generation_config.eos_token_id is not None
-                and generation_config.min_new_tokens > 0
-        ):
-            processors.append(
-                MinNewTokensLengthLogitsProcessor(
-                    input_ids_seq_length,
-                    generation_config.min_new_tokens,
-                    generation_config.eos_token_id,
-                    generation_config.pad_token_id
-                )
-            )
         processors = self._merge_processor_list(processors, logits_processor)
         # `LogitNormalization` should always be the last logit processor, when present
         if generation_config.renormalize_logits is True:
@@ -333,10 +290,18 @@ class GenerationMixin:
         batch_size = origin_inputs.shape[0]
         is_encoder_decoder = self.config.is_encoder_decoder
         logger.debug("The input shape is: %s", origin_inputs.shape)
+        valid_length_each_example = []
+        for i in range(batch_size):
+            # As the nonzero returns the index and we need length
+            valid_length_each_example.append(
+                np.max(np.argwhere(origin_inputs[i] != generation_config.pad_token_id))
+                + 1
+            )
+        valid_length_each_example = np.array(valid_length_each_example)
+        logger.debug("Get the valid for each example is: %s", valid_length_each_example)
 
-        valid_length_each_example, input_ids_length = \
-            get_valid_length_each_example(origin_inputs, generation_config.pad_token_id)
-
+        # Prepare `max_length` depending on other stopping criteria.
+        input_ids_length = np.max(valid_length_each_example)
         if generation_config.max_new_tokens is not None:
             generation_config.max_length = generation_config.max_new_tokens + input_ids_length
 
@@ -567,10 +532,18 @@ class GenerationMixin:
         batch_size = origin_inputs.shape[0]
         is_encoder_decoder = self.config.is_encoder_decoder
         logger.debug("The input shape is: %s", origin_inputs.shape)
+        valid_length_each_example = []
+        for i in range(batch_size):
+            # As the nonzero returns the index and we need length
+            valid_length_each_example.append(
+                np.max(np.argwhere(origin_inputs[i] != generation_config.pad_token_id))
+                + 1
+            )
+        valid_length_each_example = np.array(valid_length_each_example)
+        logger.debug("Get the valid for each example is: %s", valid_length_each_example)
 
-        valid_length_each_example, input_ids_length = \
-            get_valid_length_each_example(origin_inputs, generation_config.pad_token_id)
-
+        # Prepare `max_length` depending on other stopping criteria.
+        input_ids_length = np.max(valid_length_each_example)
         if generation_config.max_new_tokens is not None:
             generation_config.max_length = generation_config.max_new_tokens + input_ids_length
 
@@ -815,13 +788,20 @@ class GenerationMixin:
 
         is_encoder_decoder = self.config.is_encoder_decoder
 
-        valid_length_each_example, input_ids_length = \
-            get_valid_length_each_example(origin_inputs, generation_config.pad_token_id)
-
-        if not is_encoder_decoder and input_ids_length > generation_config.max_length:
+        # get the valid length of each example
+        valid_length_each_example = []
+        for i in range(batch_beam_size):
+            # As the nonzero returns the index and we need length
+            valid_length_each_example.append(
+                np.max(np.argwhere(origin_inputs[i] != generation_config.pad_token_id))
+                + 1
+            )
+        valid_length_each_example = np.array(valid_length_each_example)
+        logger.debug("Get the valid for each example is: %s", valid_length_each_example)
+        if not is_encoder_decoder and np.max(valid_length_each_example) > generation_config.max_length:
             raise ValueError(
                 "The max_length set is smaller than the length in the input_ids."
-                f"You shout set max_length to {input_ids_length}"
+                f"You shout set max_length to {np.max(valid_length_each_example)}"
             )
 
         target_length = (
@@ -1100,12 +1080,6 @@ class GenerationMixin:
 
         logits_processor = logits_processor if logits_processor is not None else LogitsProcessorList()
 
-        # use_past should be defined in model config
-        use_past_tmp = kwargs.pop("use_past", None)
-        if use_past_tmp is not None:
-            logger.warning("use_past should be defined in model config, it will not take effect when passed to "
-                           ".generate() method.")
-
         # Handle `generation_config` and kwargs that might update it
         # priority: `generation_config` argument > `model.generation_config` (default config)
         if generation_config is None:
@@ -1128,11 +1102,8 @@ class GenerationMixin:
             generation_config.top_k = 0
         logger.info("Generation Config is: %s", generation_config)
 
-        _, input_ids_length = get_valid_length_each_example(input_ids, generation_config.pad_token_id)
-
         logits_processor = self._get_logits_processor(
             generation_config=generation_config,
-            input_ids_seq_length=input_ids_length,
             logits_processor=logits_processor,
         )
 

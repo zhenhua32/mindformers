@@ -50,4 +50,4 @@ mindformers.generation.text_generator
     :nosignatures:
     :template: classtemplate.rst
 
-    mindformers.generation.text_generator.GenerationMixin
+    mindformers.generation.text_generator.GeneratorMixin

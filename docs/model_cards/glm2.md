@@ -48,20 +48,18 @@ ChatGLM**2**-6B 是开源中英双语对话模型 [ChatGLM2-6B](https://github.c
 2. 模型配置：`configs/glm2`
 
     ```bash
-    configs/glm2
-      ├── export_glm2_6b.yaml
-      ├── run_glm2_6b.yaml
-      ├── run_glm2_6b_finetune_2k_800T_A2_64G.yaml  # Atlas 800T A2 最佳性能全量微调启动配置
-      ├── run_glm2_6b_finetune_2k_800_32G.yaml      # Atlas 800 最佳性能全量微调启动配置
-      ├── run_glm2_6b_finetune_800T_A2_64G.yaml     # Atlas 800T A2 ADGEN全量微调启动配置
-      ├── run_glm2_6b_finetune_800_32G.yaml         # Atlas 800 ADGEN全量微调启动配置
-      ├── run_glm2_6b_finetune_eval.yaml            # 全量微调后评估配置
-      ├── run_glm2_6b_lora_2k_800T_A2_64G.yaml      # Atlas 800T A2最佳性能 lora微调启动配置
-      ├── run_glm2_6b_lora_2k_800_32G.yaml          # Atlas 800 最佳性能 lora微调启动配置
-      ├── run_glm2_6b_lora_800T_A2_64G.yaml         # Atlas 800T A2 ADGEN lora微调启动配置
-      ├── run_glm2_6b_lora_800_32G.yaml             # Atlas 800 ADGEN lora微调启动配置
-      ├── run_glm2_6b_lora_eval.yaml                # lora微调评估配置
-      └── run_glm2_6b_ptuning2.yaml                 # Atlas 800 ADGEN ptuning微调启动配置
+    glm2
+        ├── export_glm2_6b.yaml                # 导出mindir配置
+        ├── run_glm2_6b_finetune_2k_910b.yaml  # Atlas 800T A2最佳性能全量微调启动配置
+        ├── run_glm2_6b_finetune_2k.yaml       # Atlas 800最佳性能全量微调启动配置
+        ├── run_glm2_6b_finetune_910b.yaml     # Atlas 800T A2 ADGEN全量微调启动配置
+        ├── run_glm2_6b_finetune.yaml          # Atlas 800 ADGEN全量微调启动配置
+        ├── run_glm2_6b_finetune_eval.yaml     # 全量微调评估配置
+        ├── run_glm2_6b_lora_2k_910b.yaml      # Atlas 800T A2最佳性能lora微调启动配置
+        ├── run_glm2_6b_lora_2k.yaml           # Atlas 800最佳性能lora微调启动配置
+        ├── run_glm2_6b_lora_910b.yaml         # Atlas 800 ADGEN lora微调启动配置
+        ├── run_glm2_6b_lora.yaml              # Atlas 800 ADGEN lora微调启动配置
+        └── run_glm2_6b_lora_eval.yaml         # lora微调评估配置
     ```
 
 ## 前期准备
@@ -359,18 +357,11 @@ print(predict_result)
 ### 基于Pipeline的快速推理
 
 ```python
-import mindspore
-mindspore.set_context(mode=0, device_id=0)
-
-from mindformers import pipeline
+from mindformers import pipeline, TextGenerationPipeline
 task_pipeline = pipeline(task='text_generation', model='glm2_6b', max_length=2048)
 task_pipeline('你好')
 # [{'text_generation_text': ['你好，我是 ChatGLM2-6B， 一个人工智能助手。我背后使用的模型是 GLM2-6B， 是一种大型语言模型， 具有超过 2000 亿参数，支持多种任务。']}]
-
-from mindformers import AutoModel, AutoTokenizer, TextGenerationPipeline
-model = AutoModel.from_pretrained('glm2_6b')
-tokenizer = AutoTokenizer.from_pretrained('glm2_6b')
-pipeline = TextGenerationPipeline(model=model, tokenizer=tokenizer)
+pipeline = TextGenerationPipeline(model='glm2_6b', max_length=2048)
 predict_result = pipeline("你好")
 print(predict_result)
 # [{'text_generation_text': ['你好，我是 ChatGLM2-6B， 一个人工智能助手。我背后使用的模型是 GLM2-6B， 是一种大型语言模型， 具有超过 2000 亿参数，支持多种任务。']}]
@@ -385,7 +376,10 @@ print(predict_result)
 ADGEN 数据集任务为根据输入（content）生成一段广告词（summary）。
 
 ```json
-{"content": "类型#上衣*版型#宽松*版型#显瘦*图案#线条*衣样式#衬衫*衣袖型#泡泡袖*衣款式#抽绳", "summary": "这件衬衫的款式非常的宽松，利落的线条可以很好的隐藏身材上的小缺点，穿在身上有着很好的显瘦效果。领口装饰了一个可爱的抽绳，漂亮的绳结展现出了十足的个性，配合时尚的泡泡袖型，尽显女性甜美可爱的气息。"}
+{
+    "content": "类型#上衣*版型#宽松*版型#显瘦*图案#线条*衣样式#衬衫*衣袖型#泡泡袖*衣款式#抽绳",
+    "summary": "这件衬衫的款式非常的宽松，利落的线条可以很好的隐藏身材上的小缺点，穿在身上有着很好的显瘦效果。领口装饰了一个可爱的抽绳，漂亮的绳结展现出了十足的个性，配合时尚的泡泡袖型，尽显女性甜美可爱的气息。"
+}
 ```
 
 从 [Google Drive](https://drive.google.com/file/d/13_vf0xRTQsyneRKdD1bZIr93vBGOczrk/view?usp=sharing) 或者 [Tsinghua Cloud](https://cloud.tsinghua.edu.cn/f/b3f119a008264b1cabd1/?dl=1) 下载处理好的 ADGEN 数据集，目录结构为
@@ -396,32 +390,68 @@ AdvertiseGen
   └── dev.json
 ```
 
-修改配置文件 `configs/glm2/run_glm2_6b_*.yaml` 中的以下项：
+将任务配置文件 `configs/glm2/run_glm2_6b_*.yaml` 中的 `==== dataset config ====` 部分替换成：
 
 ```yaml
 train_dataset: &train_dataset
+  data_loader:
+    type: ADGenDataLoader
     dataset_dir: "/path/to/AdvertiseGen/train.json"
+    shuffle: True
+    phase: "train"
+    version: 2
     origin_columns: ["content", "summary"]
   tokenizer:
+    type: ChatGLM2Tokenizer
     vocab_file: "/path/to/tokenizer.model"
   input_columns: ["input_ids", "labels"]
   max_source_length: 64
-  max_target_length: 127
+  max_target_length: 128
+  ignore_pad_token_for_loss: True
+  num_parallel_workers: 8
+  python_multiprocessing: False
+  drop_remainder: True
+  batch_size: 1
+  repeat: 1
+  numa_enable: False
+  prefetch_size: 1
+  seed: 0
+
+train_dataset_task:
+  type: KeyWordGenDataset
+  dataset_config: *train_dataset
 
 eval_dataset: &eval_dataset
   data_loader:
+    type: ADGenDataLoader
     dataset_dir: "/path/to/AdvertiseGen/dev.json"
+    shuffle: False
+    phase: "eval"
+    version: 2
     origin_columns: ["content", "summary"]
   tokenizer:
+    type: ChatGLM2Tokenizer
     vocab_file: "/path/to/tokenizer.model"
   max_source_length: 256
   max_target_length: 256
+  ignore_pad_token_for_loss: True
+  input_columns: ["input_ids", "labels"]
+  num_parallel_workers: 8
+  python_multiprocessing: False
+  drop_remainder: True
+  batch_size: 1
+  repeat: 1
+  numa_enable: False
+  prefetch_size: 1
+  seed: 0
+
+eval_dataset_task:
+  type: KeyWordGenDataset
+  dataset_config: *eval_dataset
 ```
 
-**注意**：微调时的模型`seq_length`需要等于微调数据集的`max_source_length + max_target_length + 1`。
-yaml文件中默认的`seq_length: 192`以及`max_source_length: 64`和`max_target_length: 127`适用于ADGEN数据集，
-其他数据集的`seq_length`设置，可以遍历并将数据集转换为token_id，取token_id最大长度，`seq_length`太大影响训练性能，
-太小影响训练精度，需要做出权衡。
+> 注意：微调时的模型`seq_length`需要等于微调数据集的`max_source_length + max_target_length + 1`。
+> yaml文件中默认的`seq_length: 193`以及`max_source_length: 64`和`max_target_length: 128`适用于ADGEN数据集
 
 ### 全参微调
 
@@ -709,21 +739,6 @@ python run_mindformer.py --config configs/glm2/run_glm2_6b_finetune_eval.yaml--r
 python run_mindformer.py --config configs/glm2/run_glm2_6b_lora_eval.yaml --run_mode eval --load_checkpoint /path/to/glm2_6b_lora.ckpt --device_id 0 --use_parallel False
 ```
 
-> 单卡评测时，应将yaml中 model:model_config:batch_size 修改为等于 runner_config:batch_size
-
-### 多卡评测
-
-执行脚本：
-
-```bash
-cd scripts
-bash run_distribute.sh /path/to/hccl_8p_01234567_127.0.1.1.json ../configs/glm2/run_glm2_6b_*_eval.yaml '[0,8]' eval
-```
-
-> 全参微调请选择 `configs/glm2/run_glm2_6b_finetune_eval.yaml`
-> lora微调请选择 `configs/glm2/run_glm2_6b_lora_eval.yaml`
-> 多卡评测时，应将yaml中 model:model_config:batch_size 修改为等于 global_batch_size。例如 bs8/dp4/mp2的配置, batch_size = 8 * 4 = 32
-
 ## 推理
 
 ### 基于generate的推理
@@ -740,9 +755,8 @@ ms.set_context(mode=ms.GRAPH_MODE, device_target="Ascend", device_id=0)
 # **注意** P-Tuning 微调模型替换成 “glm2_6b_ptuning2”
 config = AutoConfig.from_pretrained("glm2_6b")
 # 可以在此使用下行代码指定自定义权重进行推理，默认使用自动从obs上下载的预训练权重
-# config.checkpoint_name_or_path = "/path/to/your/chatglm2_6b.ckpt"
+# config.checkpoint_name_or_path = "/path/to/glm2_6b_finetune.ckpt"
 config.use_past = True
-config.seq_length = 1024
 model = AutoModel.from_config(config)
 
 # 以下两种tokenizer实例化方式选其一即可
@@ -901,64 +915,3 @@ Please enter your predict data:
 ```bash
 ['[Round 1]\n\n问：你好。\n\n答： 你好👋！我是人工智能助手 ChatGLM2-6B，很高兴见到你，欢迎问我任何问题。']
 ```
-
-## Q & A
-
-### Q1: 网络训练 loss 不下降、网络训练溢出、`overflow_cond=True` 怎么办？
-
-A1: 执行训练前设置环境变量：
-
-```bash
-export MS_ASCEND_CHECK_OVERFLOW_MODE="INFNAN_MODE"
-```
-
-重新启动训练。
-
-### Q2: 推理速度非常慢、Mindspore只能跑在CPU上、报错中含有 `te`、`tbe`、`tvm`等字样？
-
-A2: 一般是 Mindspore + Ascend 环境安装问题，确认环境安装过程参照
-[安装指南](https://www.mindspore.cn/install/#%E6%89%8B%E5%8A%A8%E5%AE%89%E8%A3%85)并且成功设置了环境变量。执行：
-
-```python
-python -c "import mindspore;mindspore.set_context(device_target='Ascend');mindspore.run_check()"
-```
-
-假如执行输出：
-
-```bash
-MindSpore version: 版本号
-The result of multiplication calculation is correct, MindSpore has been installed on platform [Ascend] successfully!
-```
-
-并且没有报错，则说明成功安装了环境。
-
-或许你想问，有没有更方便的环境安装方式？恭喜你，有的，我们还提供现成的
-[docker镜像](http://mirrors.cn-central-221.ovaijisuan.com/mirrors.html)，可以依据需求自行取用。
-
-### Q3: Sync stream Failed、exec graph xxx failed？
-
-A3:这类报错较为宽泛，可以打开昇腾host日志进一步定位。
-
-```bash
-export ASCEND_GLOBAL_EVENT_ENABLE=0
-export ASCEND_GLOBAL_LOG_LEVEL=2
-export ASCEND_SLOG_PRINT_TO_STDOUT=1
-```
-
-打开昇腾host日志后模型性能将明显下降，定位问题结束后需要取消昇腾日志：
-
-```bash
-unset ASCEND_GLOBAL_EVENT_ENABLE ASCEND_GLOBAL_LOG_LEVEL ASCEND_SLOG_PRINT_TO_STDOUT
-```
-
-### Q4: the strategy is xxxxxx, shape xxxx cannot be divisible by value x
-
-A4: 检查模型句长是否满足 `max_source_length + max_target_length + 1 = seq_length` 的要求。
-
-### 仍然有疑问？欢迎向我们提出issue，我们将尽快为您解决
-
-提问时麻烦提供以下信息：
-
-1. 执行命令
-2. 运行环境，包括硬件版本、CANN版本、Mindspore版本、Mindformers版本
-3. 报错完整日志

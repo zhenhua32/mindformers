@@ -110,7 +110,7 @@ class GLMInputsOfInfer(BaseInputsOfInfer):
     """
     glm infer inputs.
     """
-    def get_masks_np(self, input_ids, tokenizer: PreTrainedTokenizerBase):
+    def get_masks_np(self, input_ids, tokenizer: BaseTokenizer):
         batch_size, seq_length = input_ids.shape
         context_lengths = [list(seq).index(tokenizer.bos_token_id) for seq in input_ids]
         attention_mask = np.tril(np.ones((batch_size, seq_length, seq_length)))
@@ -120,7 +120,7 @@ class GLMInputsOfInfer(BaseInputsOfInfer):
         attention_mask = np.array(attention_mask < 0.5, np.bool_)
         return attention_mask
 
-    def get_position_ids_np(self, input_ids, mask_positions, tokenizer: PreTrainedTokenizerBase,
+    def get_position_ids_np(self, input_ids, mask_positions, tokenizer: BaseTokenizer,
                             use_gmasks=None, position_encoding_2d=True):
         """Get position ids from input_ids and mask_positions with numpy"""
         batch_size, seq_length = input_ids.shape

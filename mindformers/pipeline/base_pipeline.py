@@ -1,5 +1,4 @@
-# Copyright 2022-2024 Huawei Technologies Co., Ltd
-# Copyright 2023 The HuggingFace Inc. team.
+# Copyright 2022 Huawei Technologies Co., Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -19,7 +18,6 @@
 """BasePipeline"""
 from abc import ABC, abstractmethod
 from typing import Optional, Union
-import os
 import numpy as np
 
 from tqdm import tqdm
@@ -32,66 +30,40 @@ from mindspore.dataset.engine.datasets import BatchDataset, RepeatDataset
 
 from mindformers.tools import logger
 from mindformers.mindformer_book import print_dict
-from mindformers.models import BaseModel, BaseImageProcessor, PreTrainedTokenizerBase
-from mindformers.models.modeling_utils import PreTrainedModel
+from ..auto_class import AutoModel
+from ..models import BaseModel, BaseTokenizer, BaseImageProcessor
 
 
-class _ScikitCompat(ABC):
-    """
-    Interface layer for the Scikit and Keras compatibility
-    """
-
-    @abstractmethod
-    def transform(self, *args, **kwargs):
-        raise NotImplementedError()
-
-    @abstractmethod
-    def predict(self, *args, **kwargs):
-        raise NotImplementedError()
-
-
-class Pipeline(_ScikitCompat):
+class BasePipeline(ABC):
     r"""
     Base Pipeline For All Task Pipelines
 
     Args:
-        model (Union[PreTrainedModel]):
-            The model used to perform task, the input should be a model instance inherited from PreTrainedModel.
-        tokenizer (Optional[PreTrainedTokenizerBase]):
+        model (Union[str, BaseModel]):
+            The model used to perform task, the input could be a supported model name, or a model instance inherited
+            from BaseModel.
+        tokenizer (Optional[BaseTokenizer]):
             The tokenizer of model, it could be None if the model do not need tokenizer.
         image_processor (Optional[BaseImageProcessor]):
             The image_processor of model, it could be None if the model do not need image_processor.
-        framework (`str`, *optional*):
-            The framework to use, only support `"ms"` for now. MindSpore framework must be installed.
-        task (`str`, defaults to `""`):
-            A task-identifier for the pipeline.
-        binary_output (`bool`, *optional*, defaults to `False`):
-            Flag indicating if the output the pipeline should happen in a binary format (i.e., pickle) or as raw text.
-            Reversed for now.
     """
     _support_list = {}
 
-    def __init__(self, model: Union[BaseModel, PreTrainedModel, Model],
-                 tokenizer: Optional[PreTrainedTokenizerBase] = None,
-                 feature_extractor=None,
+    def __init__(self, model: Union[str, BaseModel, Model],
+                 tokenizer: Optional[BaseTokenizer] = None,
                  image_processor: Optional[BaseImageProcessor] = None,
-                 framework: Optional[str] = "ms",
-                 task: str = "",
-                 binary_output: bool = False,
                  **kwargs):
-        super(Pipeline, self).__init__()
+        super(BasePipeline, self).__init__()
         self.model = model
-        if isinstance(model, (BaseModel, PreTrainedModel)):
+        if isinstance(model, str) and model in self._support_list:
+            self.network = AutoModel.from_pretrained(model)
+        elif isinstance(model, BaseModel):
             self.network = model
         elif isinstance(model, Model):
             self.network = model.predict_network
         else:
-            raise TypeError(f"model should be inherited from PreTrainedModel or Model, but got type {type(model)}.")
-        self.framework = framework
-        self.task = task
-        self.binary_output = binary_output
+            raise TypeError(f"model should be str or inherited from BaseModel or Model, but got type {type(model)}.")
         self.tokenizer = tokenizer
-        self.feature_extractor = feature_extractor
         self.image_processor = image_processor
         self._preprocess_params, self._forward_params, \
         self._postprocess_params = self._sanitize_parameters(**kwargs)
@@ -177,45 +149,6 @@ class Pipeline(_ScikitCompat):
         """
         raise NotImplementedError("_sanitize_parameters not implemented")
 
-    def save_pretrained(self, save_directory: str, save_name: str = 'mindspore_model'):
-        r"""Save the pipeline's model and tokenizer
-
-        Args:
-            save_directory('str'):
-                A path to the directory where to saved. It will be created if it doesn't exist
-            save_name(str): the name of saved files, including model weight and configuration file.
-                Default mindspore_model.
-        """
-        if os.path.isfile(save_directory):
-            logger.error(f"provided path ({save_directory}) should be a directory, not a file")
-            return
-
-        os.makedirs(save_directory, exist_ok=True)
-
-        self.model.save_pretrained(save_directory, save_name)
-
-        if self.tokenizer is not None:
-            self.tokenizer.save_pretrained(save_directory, save_name=save_name)
-
-        if self.feature_extractor is not None:
-            self.feature_extractor.save_pretrained(save_directory, save_name)
-
-        # todo: save image_processor dep
-        if self.image_processor is not None:
-            self.image_processor.save_pretrained(save_directory, save_name)
-
-    def transform(self, *args, **kwargs):
-        """Compatibility method
-        Scikit / Keras interface to pipelines. This method will forward to __call__()
-        """
-        return self(*args, **kwargs)
-
-    def predict(self, *args, **kwargs):
-        """Compatibility method
-        Scikit / Keras interface to pipelines. This method will forward to __call__()
-        """
-        return self(*args, **kwargs)
-
     def run_single(self, inputs: Union[dict, str, np.array, Tensor],
                    preprocess_params: dict,
                    forward_params: dict,
@@ -287,6 +220,7 @@ class Pipeline(_ScikitCompat):
         """
         raise NotImplementedError("preprocess not implemented.")
 
+    @abstractmethod
     def forward(self, model_inputs: Union[dict, str, np.array, Tensor],
                 **forward_params):
         r"""The Forward Process of Model
@@ -300,11 +234,7 @@ class Pipeline(_ScikitCompat):
         Raises:
             NotImplementedError: If the method is not implemented.
         """
-        return self._forward(model_inputs, **forward_params)
-
-    @abstractmethod
-    def _forward(self, model_inputs, **forward_params):
-        raise NotImplementedError("_forward not implemented")
+        raise NotImplementedError("forward not implemented.")
 
     @abstractmethod
     def postprocess(self, model_outputs: Union[dict, str, np.array, Tensor],

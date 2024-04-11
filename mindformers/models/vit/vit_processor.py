@@ -19,14 +19,12 @@ import numpy as np
 from PIL import Image
 
 from mindspore import Tensor
-from mindspore.dataset.vision import CenterCrop, ToTensor, Normalize
+from mindspore.dataset.vision import CenterCrop, ToTensor, Normalize, Rescale
 
 from mindformers.mindformer_book import MindFormerBook
 from mindformers.dataset import Resize
 from mindformers.dataset.base_dataset import BaseDataset
-from mindformers.models.tokenization_utils_base import PreTrainedTokenizerBase
-from mindformers.models.image_processing_utils import BaseImageProcessor
-from mindformers.models.processing_utils import ProcessorMixin
+from mindformers.models.base_processor import BaseProcessor, BaseImageProcessor
 from mindformers.tools.register import MindFormerRegister, MindFormerModuleType
 
 
@@ -45,21 +43,13 @@ class ViTImageProcessor(BaseImageProcessor):
         <class 'mindformers.models.vit.vit_processor.ViTImageProcessor'>
     """
 
-    def __init__(self,
-                 size=224,
-                 resize=256,
-                 mean=(0.485, 0.456, 0.406),
-                 std=(0.229, 0.224, 0.225),
-                 is_hwc=False,
-                 interpolation='cubic',
-                 **kwargs):
-        super().__init__(**kwargs)
-        self.size = size
-        self.resize = resize
-        self.mean = mean
-        self.std = std
-        self.is_hwc = is_hwc
-        self.interpolation = interpolation
+    def __init__(self, size=224):
+        super().__init__(image_resolution=size)
+        self.resize = Resize(256, interpolation='cubic')
+        self.center_crop = CenterCrop(size)
+        self.to_tensor = ToTensor()
+        self.rescale = Rescale(1.0 / 255.0, 0.0)
+        self.normalize = Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225], is_hwc=False)
 
     def preprocess(self, images, **kwargs):
         """
@@ -73,17 +63,12 @@ class ViTImageProcessor(BaseImageProcessor):
         """
         images = self._format_inputs(images)
 
-        resize = Resize(self.resize, interpolation=self.interpolation)
-        center_crop = CenterCrop(self.size)
-        to_tensor = ToTensor()
-        normalize = Normalize(mean=self.mean, std=self.std, is_hwc=self.is_hwc)
-
         res = []
         for image in images:
-            image = resize(image)
-            image = center_crop(image)
-            image = to_tensor(image)
-            image = normalize(image)
+            image = self.resize(image)
+            image = self.center_crop(image)
+            image = self.to_tensor(image)
+            image = self.normalize(image)
             res.append(image)
         return Tensor(res)
 
@@ -134,47 +119,16 @@ class ViTImageProcessor(BaseImageProcessor):
 
 
 @MindFormerRegister.register(MindFormerModuleType.PROCESSOR)
-class ViTProcessor(ProcessorMixin):
+class ViTProcessor(BaseProcessor):
     """
     Vit processor,
     consists of a feature extractor (BaseFeatureEXtractor) for image input,
-    and a tokenizer (PreTrainedTokenizerBase) for text input.
+    and a tokenizer (BaseTokenizer) for text input.
     """
     _support_list = MindFormerBook.get_processor_support_list()['vit']
-
-    attributes = ["image_processor"]
-    image_processor_class = "ViTImageProcessor"
 
     def __init__(self, image_processor=None, return_tensors='ms'):
         super().__init__(
             image_processor=image_processor,
             return_tensors=return_tensors
         )
-
-    def __call__(self, text_input=None, text_pair=None):
-        """call function"""
-        output = {}
-        if not self.tokenizer:
-            raise ValueError(f"For {self.__name__}, the `tokenizer` should not be None.")
-        if not isinstance(self.tokenizer, PreTrainedTokenizerBase):
-            raise TypeError(f"tokenizer should inherited from the PreTrainedTokenizerBase,"
-                            f" but got {type(self.tokenizer)}.")
-        if text_input:
-            # Format the input into a batch
-            if isinstance(text_input, str):
-                text_input = [text_input]
-            text_output = self.tokenizer(text_input, return_tensors=self.return_tensors,
-                                         max_length=self.max_length,
-                                         padding=self.padding)["input_ids"]
-            output['text'] = text_output
-
-        if text_pair:
-            # Format the input into a batch
-            if isinstance(text_pair, str):
-                text_input = [text_pair]
-            text_output = self.tokenizer(text_pair, return_tensors=self.return_tensors,
-                                         max_length=self.tgt_max_length,
-                                         padding=self.padding)["input_ids"]
-            output['tgt_output'] = text_output
-
-        return output

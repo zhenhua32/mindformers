@@ -18,11 +18,10 @@ How to run this:
 pytest tests/st/test_model/test_codegeex2_model/test_auto_class.py
 """
 import os
-import shutil
+
 from mindspore import context
 
-from mindformers import MindFormerBook, AutoModel, PreTrainedModel, AutoConfig, PretrainedConfig, AutoTokenizer, \
-    PreTrainedTokenizerBase
+from mindformers import MindFormerBook, AutoModel, BaseModel, AutoConfig, BaseConfig, AutoTokenizer, BaseTokenizer
 
 
 class TestGLMAutoClassMethod:
@@ -34,10 +33,6 @@ class TestGLMAutoClassMethod:
         self.save_directory = MindFormerBook.get_default_checkpoint_save_folder()
         self.test_llm_list = ["codegeex2_6b"]
 
-    def teardown_method(self):
-        for model_or_config_type in self.test_llm_list:
-            shutil.rmtree(os.path.join(self.save_directory, model_or_config_type), ignore_errors=True)
-
     def test_codegeex2_model(self):
         """
         Feature: AutoModel.
@@ -48,7 +43,7 @@ class TestGLMAutoClassMethod:
         # Too time-cost, not used for now.
         for model_type in self.test_llm_list:
             model = AutoModel.from_pretrained(model_type, download_checkpoint=False)
-            assert isinstance(model, PreTrainedModel)
+            assert isinstance(model, BaseModel)
             model.save_pretrained(
                 save_directory=os.path.join(self.save_directory, model_type),
                 save_name=model_type + "_model",
@@ -63,7 +58,7 @@ class TestGLMAutoClassMethod:
         # input model config name, load model and weights
         for config_type in self.test_llm_list:
             model_config = AutoConfig.from_pretrained(config_type)
-            assert isinstance(model_config, PretrainedConfig)
+            assert isinstance(model_config, BaseConfig)
             model_config.save_pretrained(
                 save_directory=os.path.join(self.save_directory, config_type),
                 save_name=config_type + "_config",
@@ -79,7 +74,7 @@ class TestGLMAutoClassMethod:
         # input processor name
         tokenizer_type = "codegeex2_6b"
         tokenizer = AutoTokenizer.from_pretrained(tokenizer_type)
-        assert isinstance(tokenizer, PreTrainedTokenizerBase)
+        assert isinstance(tokenizer, BaseTokenizer)
         tokenizer.save_pretrained(
             save_directory=os.path.join(self.save_directory, tokenizer_type),
             save_name=tokenizer_type + "_tokenizer",

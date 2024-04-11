@@ -13,23 +13,19 @@
 # limitations under the License.
 # ============================================================================
 """T5 Configuration"""
-from typing import Union
-
-from mindspore._checkparam import args_type_check
-
 from mindformers.modules.transformer.moe import MoEConfig
 from mindformers.modules.transformer.transformer import default_transformer_config, default_moe_config, \
     TransformerOpParallelConfig
 from mindformers.tools.register import MindFormerRegister, MindFormerModuleType
-from mindformers.models.utils import convert_mstype
-from mindformers.models.configuration_utils import PretrainedConfig
-from mindformers.mindformer_book import MindFormerBook
+from ..utils import convert_mstype
+from ..base_config import BaseConfig
+from ...mindformer_book import MindFormerBook
 
 __all__ = ['T5Config']
 
 
 @MindFormerRegister.register(MindFormerModuleType.CONFIG)
-class T5Config(PretrainedConfig):
+class T5Config(BaseConfig):
     """
     T5 config class which defines the model size
 
@@ -128,12 +124,8 @@ class T5Config(PretrainedConfig):
     Returns:
         Class, T5Config.
     """
-
-    model_type = "t5"
     _support_list = MindFormerBook.get_config_support_list()['t5']
 
-    @args_type_check(parallel_config=(dict, TransformerOpParallelConfig),
-                     moe_config=(dict, MoEConfig))
     def __init__(self,
                  vocab_size: int = 32128,
                  hidden_size: int = 512,
@@ -162,7 +154,7 @@ class T5Config(PretrainedConfig):
                  compute_dtype: str = "float32",
                  has_relative_bias: bool = True,
                  scale_output: bool = True,
-                 parallel_config: Union[dict, TransformerOpParallelConfig] = default_transformer_config,
+                 parallel_config: TransformerOpParallelConfig = default_transformer_config,
                  checkpoint_name_or_path: str = None,
                  top_p: float = 0.95,
                  top_k: int = 1,
@@ -176,14 +168,9 @@ class T5Config(PretrainedConfig):
                  post_layernorm_residual: bool = False,
                  offset: int = 0,
                  use_past: bool = False,
-                 moe_config: Union[dict, MoEConfig] = default_moe_config,
-                 dtype=None,
+                 moe_config: MoEConfig = default_moe_config,
                  **kwargs):
         super(T5Config, self).__init__(**kwargs)
-        if isinstance(parallel_config, dict):
-            parallel_config = TransformerOpParallelConfig(**parallel_config)
-        if isinstance(moe_config, dict):
-            moe_config = MoEConfig(**moe_config)
         self.batch_size = batch_size
         self.seq_length = seq_length
         self.vocab_size = vocab_size
@@ -226,4 +213,3 @@ class T5Config(PretrainedConfig):
         self.offset = offset
         self.moe_config = moe_config
         self.param_init_type = convert_mstype(param_init_type)
-        self.dtype = dtype

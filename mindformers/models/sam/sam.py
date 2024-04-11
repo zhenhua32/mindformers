@@ -21,25 +21,13 @@ import mindspore.ops as ops
 from mindformers.models.build_model import build_model
 from mindformers.tools.register import MindFormerRegister, MindFormerModuleType
 from mindformers.mindformer_book import MindFormerBook
-from mindformers.models.modeling_utils import PreTrainedModel
-from .sam_config import SamConfig
-
-
-class SamPreTrainedModel(PreTrainedModel):
-    """
-    An abstract class to handle weights initialization and a simple interface for downloading and loading pretrained
-    models.
-    """
-
-    config_class = SamConfig
-    base_model_prefix = "sam"
-
+from mindformers.models.base_model import BaseModel
 
 @MindFormerRegister.register(MindFormerModuleType.MODELS)
-class SamModel(SamPreTrainedModel):
+class Sam(BaseModel):
     """
     SAM predicts object masks from an image and input prompts.
-    If prompts are not known in advance, using SamModel is recommended over calling the model directly.
+    If prompts are not known in advance, using Sam is recommended over calling the model directly.
     """
     mask_threshold: float = 0.0
     image_format: str = "RGB"

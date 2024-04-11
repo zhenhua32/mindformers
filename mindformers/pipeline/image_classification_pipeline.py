@@ -21,21 +21,23 @@ from PIL import Image
 from mindspore.ops import operations as P
 from mindspore import Tensor, Model
 
+from mindformers.auto_class import AutoProcessor, AutoModel
 from mindformers.mindformer_book import MindFormerBook
-from mindformers.models import PreTrainedModel, BaseImageProcessor
+from mindformers.models import BaseModel, BaseImageProcessor
 from mindformers.tools.image_tools import load_image
 from mindformers.tools.register import MindFormerRegister, MindFormerModuleType
 from mindformers.dataset.labels import labels
-from .base_pipeline import Pipeline
+from .base_pipeline import BasePipeline
 
 
 @MindFormerRegister.register(MindFormerModuleType.PIPELINE, alias="image_classification")
-class ImageClassificationPipeline(Pipeline):
+class ImageClassificationPipeline(BasePipeline):
     r"""Pipeline for image classification
 
     Args:
-        model (Union[PretrainedModel, Model]):
-            The model used to perform task, the input should be a model instance inherited from PretrainedModel.
+        model (Union[str, BaseModel]):
+            The model used to perform task, the input could be a supported model name, or a model instance
+            inherited from BaseModel.
         image_processor (Optional[BaseImageProcessor]):
             The image_processor of model, it could be None if the model do not need image_processor.
 
@@ -48,11 +50,10 @@ class ImageClassificationPipeline(Pipeline):
     Examples:
         >>> import numpy as np
         >>> from mindformers.pipeline import ImageClassificationPipeline
-        >>> from mindformers import AutoModel, ViTImageProcessor
-        >>> model = AutoModel.from_pretrained("vit_base_p16")
+        >>> from mindformers import ViTImageProcessor
         >>> processor = ViTImageProcessor(size=224)
         >>> classifier = ImageClassificationPipeline(
-        ...     model=model,
+        ...     model='vit_base_p16',
         ...     image_processor=processor,
         ...     top_k=5
         ...     )
@@ -66,9 +67,23 @@ class ImageClassificationPipeline(Pipeline):
     """
     _support_list = MindFormerBook.get_pipeline_support_task_list()['image_classification'].keys()
 
-    def __init__(self, model: Union[PreTrainedModel, Model],
+    def __init__(self, model: Union[str, BaseModel, Model],
                  image_processor: Optional[BaseImageProcessor] = None,
                  **kwargs):
+        if isinstance(model, str):
+            if model in self._support_list:
+                if image_processor is None:
+                    image_processor = AutoProcessor.from_pretrained(model).image_processor
+                if not isinstance(image_processor, BaseImageProcessor):
+                    raise TypeError(f"image_processor should be inherited from"
+                                    f" BaseImageProcessor, but got {type(image_processor)}.")
+                model = AutoModel.from_pretrained(model)
+            else:
+                raise ValueError(f"{model} is not supported by ImageClassificationForPipeline,"
+                                 f"please selected from {self._support_list}.")
+
+        if not isinstance(model, (BaseModel, Model)):
+            raise TypeError(f"model should be inherited from BaseModel or Model, but got type {type(model)}.")
 
         if image_processor is None:
             raise ValueError("ImageClassificationFoPipeline"
@@ -114,8 +129,8 @@ class ImageClassificationPipeline(Pipeline):
         image_processed = self.image_processor(inputs)
         return {"image_processed": image_processed}
 
-    def _forward(self, model_inputs: dict,
-                 **forward_params):
+    def forward(self, model_inputs: dict,
+                **forward_params):
         r"""The Forward Process of Model
 
         Args:
