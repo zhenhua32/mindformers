@@ -93,7 +93,7 @@ class Qwen2Tokenizer(Tokenizer):
             errors="replace",
             unk_token="<|endoftext|>",
             bos_token=None,
-            eos_token="<|endoftext|>",
+            eos_token="<|im_end|>",
             pad_token="<|endoftext|>",
             clean_up_tokenization_spaces=False,
             split_special_tokens=False,
@@ -123,6 +123,7 @@ class Qwen2Tokenizer(Tokenizer):
         _ = AddedToken(IMSTART, lstrip=False, rstrip=False, special=True, normalized=False)
         _ = AddedToken(IMEND, lstrip=False, rstrip=False, special=True, normalized=False)
         self.special_tokens = {
+            "<|endoftext|>": 151643,
             IMSTART: IMSTARTID,
             IMEND: IMENDID,
         }
@@ -152,6 +153,11 @@ class Qwen2Tokenizer(Tokenizer):
                 "Qwen2Tokenizer does not support `add_prefix_space`, setting it to True has no effect."
             )
 
+        added_tokens_decoder = {
+            151643: AddedToken("<|endoftext|>", lstrip=False, rstrip=False, special=True, normalized=False),
+            IMSTARTID: AddedToken(IMSTART, lstrip=False, rstrip=False, special=True, normalized=False),
+            IMENDID: AddedToken(IMEND, lstrip=False, rstrip=False, special=True, normalized=False),
+        }
         super().__init__(
             errors=errors,
             bos_token=bos_token,
@@ -160,6 +166,7 @@ class Qwen2Tokenizer(Tokenizer):
             unk_token=unk_token,
             clean_up_tokenization_spaces=clean_up_tokenization_spaces,
             split_special_tokens=split_special_tokens,
+            added_tokens_decoder=added_tokens_decoder,
             **kwargs,
         )
 
