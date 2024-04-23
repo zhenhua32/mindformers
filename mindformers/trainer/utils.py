@@ -239,7 +239,7 @@ def config2dict(config):
     return new_dict
 
 
-def load_distributed_checkpoint(checkpoint_dir, specify_prefix=None):
+def load_distributed_checkpoint(checkpoint_dir, choice_func=None):
     """Load Checkpoint in Parallel Mode."""
     if os.path.isdir(checkpoint_dir):
         logger.info(
@@ -254,7 +254,7 @@ def load_distributed_checkpoint(checkpoint_dir, specify_prefix=None):
         distribute_checkpoint_path = checkpoint_dir
     else:
         raise FileNotFoundError(f"{checkpoint_dir} is not found.")
-    checkpoint_dict = load_checkpoint(distribute_checkpoint_path, specify_prefix=specify_prefix)
+    checkpoint_dict = load_checkpoint(distribute_checkpoint_path, choice_func=choice_func)
     logger.info("Distribute load is success.")
     return checkpoint_dict
 
@@ -267,9 +267,11 @@ def load_resume_context_from_checkpoint(config, dataset):
                                 f"but get {config.load_checkpoint}")
 
     if os.path.isdir(config.load_checkpoint):
-        resume_dict = load_distributed_checkpoint(config.load_checkpoint, ["loss_scale", "epoch_num", "step_num"])
+        resume_dict = load_distributed_checkpoint(config.load_checkpoint,
+                                                  choice_func=lambda x: x in ["loss_scale", "epoch_num", "step_num"])
     else:
-        resume_dict = load_checkpoint(config.load_checkpoint, specify_prefix=["loss_scale", "epoch_num", "step_num"])
+        resume_dict = load_checkpoint(config.load_checkpoint,
+                                      choice_func=lambda x: x in ["loss_scale", "epoch_num", "step_num"])
 
     if "step_num" in resume_dict:
         config.runner_config.initial_step = int(resume_dict["step_num"])
@@ -310,8 +312,8 @@ def transform_and_load_checkpoint(config, model, network, dataset, optimizer=Non
         raise FileNotFoundError(f"The load_checkpoint must be correct, "
                                 f"but get {config.load_checkpoint}")
 
-    if check_path_include_total_ckpt(config.load_checkpoint) and not config.auto_trans_ckpt and \
-                                                                 not config.only_save_strategy:
+    if not config.auto_trans_ckpt and not config.only_save_strategy and \
+        check_path_include_total_ckpt(config.load_checkpoint):
         load_ckpt(config, network, optimizer=optimizer)
         return
 
@@ -355,6 +357,14 @@ def check_ckpt_for_transform(ckpt_dir):
     """check input ckpt_dir and transform it by using softlink"""
     soft_link_dir = os.path.join(get_output_root_path(), "softlink_ckpt")
     rank_id = get_real_rank()
+
+    if os.path.isdir(ckpt_dir) and not check_rank_folders(ckpt_dir, 0) and \
+        not check_ckpt_file_exist(ckpt_dir):
+        raise ValueError(f"No rank_0 folder or ckpt files are found under {ckpt_dir}.")
+    if os.path.isfile(ckpt_dir) and not ckpt_dir.endswith('.ckpt'):
+        raise ValueError(f"The value of load_checkpoint must be a folder or a file with suffix '.ckpt', "
+                         f"but got {ckpt_dir}")
+
     if (not rank_id) or (rank_id % 8 == 0 and check_in_modelarts()):
         if os.path.exists(soft_link_dir):
             shutil.rmtree(soft_link_dir)
@@ -374,22 +384,16 @@ def check_ckpt_for_transform(ckpt_dir):
                 else:
                     os.remove(soft_link)
                     os.symlink(ckpt_dir, soft_link)
-            elif check_ckpt_file_exist(ckpt_dir):
+            else:
                 for ckpt_file in os.listdir(ckpt_dir):
                     if ckpt_file.endswith('.ckpt'):
                         soft_link = os.path.join(soft_link_dir, os.path.splitext(ckpt_file)[0])
                         ckpt_file = os.path.join(ckpt_dir, ckpt_file)
                         make_softlink(soft_link, ckpt_file)
-            else:
-                raise ValueError(f"No rank_0 folder or ckpt files are found under {ckpt_dir}.")
         else:
-            if ckpt_dir.endswith('.ckpt'):
-                ckpt_file = ckpt_dir
-                soft_link = os.path.join(soft_link_dir, os.path.splitext(os.path.basename(ckpt_file))[0])
-                make_softlink(soft_link, ckpt_file)
-            else:
-                raise ValueError(f"The value of load_checkpoint must be a folder or a file with suffix '.ckpt', "
-                                 f"but got {ckpt_dir}")
+            ckpt_file = ckpt_dir
+            soft_link = os.path.join(soft_link_dir, os.path.splitext(os.path.basename(ckpt_file))[0])
+            make_softlink(soft_link, ckpt_file)
 
     wait_create_softlink(soft_link_dir)
 
@@ -414,6 +418,8 @@ def check_ckpt_file_exist(path):
 
 def check_path_include_total_ckpt(path):
     """check if the input path is total, not split."""
+    if path is None:
+        return False
     if os.path.isdir(path):
         if check_ckpt_file_exist(path):
             return True
@@ -452,17 +458,13 @@ def get_src_and_dst_strategy(config):
     rank_id = get_real_rank()
     world_size = get_real_group_size()
 
+    if config.src_strategy_path_or_dir:
+        assert os.path.exists(config.src_strategy_path_or_dir), \
+            f'{config.src_strategy_path_or_dir} not found!'
+
     dst_strategy_path = None
     if (not rank_id) or (rank_id % 8 == 0 and check_in_modelarts()):
-        if config.src_strategy_path_or_dir and os.path.isdir(config.src_strategy_path_or_dir):
-            if config.parallel_config.pipeline_stage > 1:
-                src_strategy_path = get_strategy(config.src_strategy_path_or_dir)
-            elif config.parallel_config.pipeline_stage == 1:
-                src_strategy_paths = glob(os.path.join(config.src_strategy_path_or_dir, "*_rank_*.ckpt"))
-                src_strategy_paths.sort()
-                src_strategy_path = src_strategy_paths[0]
-        else:
-            src_strategy_path = get_strategy(config.src_strategy_path_or_dir)
+        src_strategy_path = get_strategy(config.src_strategy_path_or_dir)
     else:
         src_strategy_path = None
 

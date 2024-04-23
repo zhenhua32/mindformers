@@ -185,7 +185,7 @@ class ChatGLM2MLP(nn.Cell):
     def __init__(self, config: ChatGLM2Config):
         super(ChatGLM2MLP, self).__init__()
         self.add_bias = config.add_bias_linear
-        self.model_name = config.model_name
+        self.prefix_name = config.prefix_name
         self.dense_h_to_4h = Linear(
             config.hidden_size,
             config.ffn_hidden_size * 2,
@@ -210,7 +210,10 @@ class ChatGLM2MLP(nn.Cell):
     def construct(self, hidden_states):
         # [bs, seq_len, 4 * hidden_size]
         intermediate_parallel = self.dense_h_to_4h(hidden_states)
+        origin_dtype = intermediate_parallel.dtype
+        intermediate_parallel = self.cast(intermediate_parallel, mstype.float32)
         intermediate_parallel = self.activation_func(intermediate_parallel)
+        intermediate_parallel = self.cast(intermediate_parallel, origin_dtype)
         # [bs, seq_len, hidden_size]
         output = self.dense_4h_to_h(intermediate_parallel)
         return output
@@ -218,7 +221,7 @@ class ChatGLM2MLP(nn.Cell):
     def shard(self, parallel_config):
         """sharding for feedforward"""
         dp, mp = parallel_config.data_parallel, parallel_config.model_parallel
-        if self.model_name.startswith("glm32k"):
+        if self.prefix_name.startswith("glm32k"):
             mp = 1
         self.dense_h_to_4h.shard(strategy_matmul=((dp, 1), (mp, 1)),
                                  strategy_bias=((dp, mp), (mp,)))
